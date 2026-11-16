@@ -7,7 +7,8 @@
 
 El panel escucha solo en esta máquina (puerto 8777). Si existe
 ``datos/tunel.yml`` se lanza además ``cloudflared`` con esa configuración para
-publicarlo en el dominio propio, y se relanza si se cae.
+publicarlo en el dominio propio, y se relanza si se cae. Además hace de red
+de seguridad: si pasan dos días sin rastreo, ejecuta el ciclo de precios él solo.
 """
 from __future__ import annotations
 
@@ -90,6 +91,33 @@ def vigilar_tunel() -> None:
         time.sleep(espera)
 
 
+def vigilar_ciclo() -> None:
+    """Red de seguridad: si a las 10:30 el último rastreo tiene dos días o más
+    (la tarea programada no se ha ejecutado), el servicio hace el ciclo él mismo.
+    Como mucho un intento al día."""
+    from precios import config, ejecucion, mercado, panel
+    intentado = None
+    while True:
+        time.sleep(600)
+        try:
+            ahora = dt.datetime.now()
+            if (ahora.hour, ahora.minute) < (10, 30) or intentado == ahora.date():
+                continue
+            fotos = sorted(mercado.DIR_MERCADO.glob("????-??-??.json"))
+            ultimo = dt.date.fromisoformat(fotos[-1].stem) if fotos else None
+            if ultimo and (ahora.date() - ultimo).days < 2:
+                continue
+            intentado = ahora.date()
+            anotar("Ciclo de respaldo: rastreo y cálculo.")
+            with panel._cerrojo:
+                salida = ejecucion.ejecutar(config.cargar(), avisar=lambda *_: None)
+            anotar("Ciclo de respaldo terminado: "
+                   + ("enviado a Smoobu." if salida.get("aplicado") else
+                      "no enviado (" + "; ".join(salida.get("bloqueado_por") or ["modo simulación"]) + ")."))
+        except Exception as e:
+            anotar(f"Ciclo de respaldo fallido: {e!r}")
+
+
 def arrancar() -> int:
     if puerto_ocupado():
         print("El servicio ya está en marcha.")
@@ -99,6 +127,7 @@ def arrancar() -> int:
     anotar(f"Servicio arrancado (PID {os.getpid()}).")
     if TUNEL.exists():
         threading.Thread(target=vigilar_tunel, daemon=True).start()
+    threading.Thread(target=vigilar_ciclo, daemon=True).start()
     from precios import panel
     try:
         panel.servir(PUERTO, abrir=False)

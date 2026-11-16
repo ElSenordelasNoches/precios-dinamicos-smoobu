@@ -130,7 +130,9 @@ encendido.
 `tarea_programada.md` contiene las instrucciones para una sesión programada de
 Claude (cada dos días): ejecuta el ciclo, revisa eventos locales y actualiza
 `datos/eventos.json`, y avisa si ve algo raro. También sirve cualquier
-programador de tareas que lance `python -m precios ejecutar`.
+programador de tareas que lance `python -m precios ejecutar`. Y si el servicio
+permanente está en marcha, hace de red de seguridad: cuando pasan dos días sin
+rastreo, ejecuta el ciclo él solo a las 10:30.
 
 ## Pruebas
 

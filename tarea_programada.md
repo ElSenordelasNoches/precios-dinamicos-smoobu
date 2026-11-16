@@ -21,6 +21,10 @@ Ejecuta `python -m precios ejecutar` y lee el resumen que imprime.
 - Si el envío queda bloqueado por el cortafuegos, no lo fuerces: explica en el
   informe qué lo ha bloqueado.
 
+Si el servicio permanente (`servicio.py`) está en marcha, él mismo hace este
+ciclo a las 10:30 cuando lleva dos días sin rastreo; no pasa nada por que
+coincidan: la segunda ejecución del día no vuelve a mover los precios.
+
 ## 2. Eventos locales (una vez por semana basta)
 
 Si `datos/eventos.json` no existe o su campo `revisado` tiene más de 7 días,
