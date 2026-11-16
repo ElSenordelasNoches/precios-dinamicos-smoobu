@@ -4,7 +4,21 @@
   "estrategia": "equilibrada",
   "mercado": {
     "lugar": "Puerto-del-Rosario--Las-Palmas--España",
-    "caja": {"sw_lat": 28.482, "sw_lng": -13.885, "ne_lat": 28.52, "ne_lng": -13.84}
+    "caja": {
+      "sw_lat": 28.482,
+      "sw_lng": -13.885,
+      "ne_lat": 28.52,
+      "ne_lng": -13.84
+    },
+    "booking": {
+      "activa": true,
+      "destino": {
+        "dest_id": -397863,
+        "tipo": "city"
+      },
+      "peso": 0.5,
+      "consultas_por_rastreo": 28
+    }
   },
   "apartamentos": [
     {
@@ -19,13 +33,27 @@
     }
   ],
   "reglas": {
-    "canales": {"airbnb": 15, "booking": 18},
+    "canales": {
+      "airbnb": 15,
+      "booking": 18
+    },
     "eventos": [
-      {"nombre": "Fiestas locales", "desde": "2027-10-01", "hasta": "2027-10-10", "ajuste_pct": 8}
+      {
+        "nombre": "Fiestas locales",
+        "desde": "2027-10-01",
+        "hasta": "2027-10-10",
+        "ajuste_pct": 8
+      }
     ],
     "ajustes_manuales": [
-      {"desde": "2027-08-01", "hasta": "2027-08-15", "tipo": "porcentaje", "valor": 5,
-       "apartamentos": null, "nota": "Agosto fuerte"}
+      {
+        "desde": "2027-08-01",
+        "hasta": "2027-08-15",
+        "tipo": "porcentaje",
+        "valor": 5,
+        "apartamentos": null,
+        "nota": "Agosto fuerte"
+      }
     ]
   }
 }

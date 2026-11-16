@@ -264,6 +264,24 @@ def escanear(cfg: dict, hoy: dt.date | None = None, rapido: bool = False,
         foto["incompleta"] = True
     DIR_MERCADO.mkdir(parents=True, exist_ok=True)
     ruta = DIR_MERCADO / f"{hoy.isoformat()}.json"
+
+    # Booking (API de pago por uso): una sola vez al día, para no gastar saldo.
+    previa = None
+    if ruta.exists():
+        try:
+            previa = json.loads(ruta.read_text(encoding="utf-8")).get("booking")
+        except ValueError:
+            previa = None
+    if previa and previa.get("ventanas"):
+        foto["booking"] = previa
+    else:
+        from . import booking
+        try:
+            b = booking.escanear(cfg, fechas, hoy, noches, avisar)
+        except Exception as e:  # Booking nunca debe estropear el rastreo
+            b = {"ventanas": [], "error": str(e)}
+        if b:
+            foto["booking"] = b
     if not foto.get("incompleta") or not ruta.exists():
         ruta.write_text(json.dumps(foto, ensure_ascii=False), encoding="utf-8")
     return foto
@@ -327,8 +345,10 @@ class ModeloMercado:
     """Señales de mercado por fecha y por tamaño (dormitorios) de alojamiento."""
 
     def __init__(self, fotos: list[dict], excluir: set[str] | None = None,
-                 hoy: dt.date | None = None):
+                 hoy: dt.date | None = None, peso_booking: float = 0.5):
         self.fotos = fotos
+        self.peso_booking = max(0.0, min(1.0, float(peso_booking)))
+        self._bk = None
         self.excluir = {str(x) for x in (excluir or set())}
         self.actual = fotos[0] if fotos else None
         self.hoy = hoy or (dt.date.fromisoformat(self.actual["dia"]) if self.actual else dt.date.today())
@@ -444,7 +464,62 @@ class ModeloMercado:
             return None
         for k in ("indice", "mediana", "p25", "p75"):
             demanda[k] = (precio or {}).get(k)
+        # Booking: segunda fuente de demanda. Se promedia con la de Airbnb.
+        demanda["ocupacion_airbnb"] = demanda.get("ocupacion")
+        demanda["ocupacion_booking"] = demanda["mediana_booking"] = None
+        bk = self.booking()
+        if bk:
+            b = self._interpolar_fecha(d, bk["ventanas"])
+            if b and b.get("ocupacion") is not None:
+                w = self.peso_booking
+                demanda["ocupacion_booking"] = b["ocupacion"]
+                demanda["mediana_booking"] = b.get("mediana")
+                for k in ("ocupacion", "desviacion", "ritmo"):
+                    if demanda.get(k) is not None and b.get(k) is not None:
+                        demanda[k] = (1 - w) * demanda[k] + w * b[k]
         return demanda
+
+    def booking(self) -> dict | None:
+        """Ventanas de Booking del último rastreo, con sus señales de demanda."""
+        if self._bk is not None:
+            return self._bk or None
+        bloque = (self.actual or {}).get("booking") or {}
+        # Oferta real: el máximo de disponibles visto a la vez en los rastreos
+        # recientes. Muchos alojamientos del destino nunca salen para una
+        # estancia dada (mínimos largos, cerrados), así que el total inflaría la
+        # ocupación; con el máximo queda en la misma escala que la de Airbnb.
+        oferta = max([v["disponibles"] for f in self.fotos
+                      for v in ((f.get("booking") or {}).get("ventanas") or [])] or [0])
+        ventanas = []
+        for v in bloque.get("ventanas") or []:
+            llegada = dt.date.fromisoformat(v["llegada"])
+            ventanas.append({"llegada": llegada, "noches": v["noches"],
+                             "antelacion": (llegada - self.dia_foto).days,
+                             "ocupacion": max(0.0, 1 - v["disponibles"] / oferta) if oferta else 0.0,
+                             "n": v["disponibles"], "total": v["total"], "mediana": v.get("mediana")})
+        if len(ventanas) < 6:
+            self._bk = {}
+            return None
+        curva = _ajuste_curva([(v["antelacion"], v["ocupacion"]) for v in ventanas])
+        previas = {}
+        for f in self.fotos[1:]:
+            dia = dt.date.fromisoformat(f["dia"])
+            if 1 <= (self.dia_foto - dia).days <= 8 and (f.get("booking") or {}).get("ventanas"):
+                previas = {dt.date.fromisoformat(v["llegada"]):
+                           (max(0.0, 1 - v["disponibles"] / oferta), (dt.date.fromisoformat(v["llegada"]) - dia).days)
+                           for v in f["booking"]["ventanas"]}
+                break
+        for v in ventanas:
+            esperado = self._curva(curva, v["antelacion"])
+            v["esperada"] = esperado
+            v["desviacion"] = v["ocupacion"] - esperado if esperado is not None else 0.0
+            v["ritmo"] = 0.0
+            if v["llegada"] in previas and curva:
+                antes, antel_antes = previas[v["llegada"]]
+                v["ritmo"] = (v["ocupacion"] - antes) - (self._curva(curva, v["antelacion"]) - self._curva(curva, antel_antes))
+        self._bk = {"ventanas": ventanas, "curva": curva, "total": ventanas[0]["total"], "oferta": oferta,
+                    "restantes": bloque.get("restantes"), "error": bloque.get("error")}
+        return self._bk
 
     def _interpolar_fecha(self, d: dt.date, vs: list[dict]) -> dict | None:
         if not vs:
@@ -477,7 +552,14 @@ class ModeloMercado:
         if not self.disponible:
             return {"disponible": False}
         s, g = self.segmento(dormitorios), self.segmento(None)
+        bk = self.booking()
         return {
+            "booking": ({"total": bk["total"], "oferta": bk["oferta"], "restantes": bk["restantes"], "error": bk["error"],
+                         "peso": self.peso_booking,
+                         "ventanas": [{"llegada": v["llegada"].isoformat(), "disponibles": v["n"],
+                                       "ocupacion": round(v["ocupacion"], 3), "mediana": v["mediana"],
+                                       "desviacion": round(v["desviacion"], 3)} for v in bk["ventanas"]]}
+                        if bk else {"error": ((self.actual or {}).get("booking") or {}).get("error")}),
             "disponible": True, "dia": self.actual["dia"], "antiguedad_dias": self.antiguedad(),
             "anuncios": s["n_anuncios"], "anuncios_zona": g["n_anuncios"],
             "oferta": g["oferta"], "nivel": s["nivel"], "curva": g["curva"],

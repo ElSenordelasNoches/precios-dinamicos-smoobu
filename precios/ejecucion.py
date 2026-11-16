@@ -52,7 +52,9 @@ def calendarios(cfg: dict, hoy: dt.date, cliente=None):
 def modelo_mercado(cfg: dict, hoy: dt.date):
     fotos = mercado.cargar_fotos(int(cfg["mercado"].get("rastreos_memoria", 10)))
     propios = {str(a["airbnb_id"]) for a in cfg["apartamentos"] if a.get("airbnb_id")}
-    return mercado.ModeloMercado(fotos, excluir=propios, hoy=hoy)
+    peso = ((cfg["mercado"].get("booking") or {}).get("peso", 0.5)
+            if (cfg["mercado"].get("booking") or {}).get("activa", True) else 0.0)
+    return mercado.ModeloMercado(fotos, excluir=propios, hoy=hoy, peso_booking=peso)
 
 
 def calcular_todo(cfg: dict, hoy: dt.date | None = None, cliente=None, cals=None, origen=None) -> dict:
@@ -218,6 +220,13 @@ def resumen(salida: dict) -> str:
             L.append(f"   Mercado ({m['anuncios']} comparables, oferta {m['oferta']}): precio por noche en Airbnb "
                      f"P25 {n[25]:.0f} · mediana {n[50]:.0f} · P75 {n[75]:.0f} €  → nuestro precio en Airbnb con la base: "
                      f"{b['valor'] * k['recargo_airbnb']:.0f} €")
+        bk = m.get("booking") or {}
+        if bk.get("ventanas"):
+            occ = [v["ocupacion"] for v in bk["ventanas"][:8]]
+            L.append(f"   Booking: {bk['total']} alojamientos en el destino (oferta real {bk['oferta']}) · ocupación media de las próximas "
+                     f"{len(occ)} ventanas {sum(occ) / len(occ):.0%} · consultas restantes este mes: {bk.get('restantes')}")
+        elif bk.get("error"):
+            L.append(f"   Booking: sin datos ({bk['error']})")
         L.append(f"   Ocupación propia: últimos 90 días {_pct(k['ocupacion_pasada_90'])} · próximos 30 {_pct(k['30']['ocupacion'])} "
                  f"(mercado {_pct(k['30']['ocupacion_mercado'])}) · próximos 90 {_pct(k['90']['ocupacion'])} "
                  f"(mercado {_pct(k['90']['ocupacion_mercado'])})")

@@ -394,7 +394,9 @@ def calcular(cfg: dict, apto: dict, cal: Calendario, modelo, hoy: dt.date,
             "mercado": ({"mediana": round(senal["mediana"], 1) if senal.get("mediana") else None,
                          "p25": round(senal["p25"], 1) if senal.get("p25") else None,
                          "p75": round(senal["p75"], 1) if senal.get("p75") else None,
-                         "ocupacion": round(senal["ocupacion"], 3) if senal.get("ocupacion") is not None else None}
+                         "ocupacion": round(senal["ocupacion"], 3) if senal.get("ocupacion") is not None else None,
+                         "ocupacion_airbnb": round(senal["ocupacion_airbnb"], 3) if senal.get("ocupacion_airbnb") is not None else None,
+                         "ocupacion_booking": round(senal["ocupacion_booking"], 3) if senal.get("ocupacion_booking") is not None else None}
                         if senal else None),
         })
         d += UN_DIA

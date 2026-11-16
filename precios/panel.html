@@ -8,12 +8,12 @@
 :root{
   --fondo:#f5f3ee; --panel:#ffffff; --tinta:#1d2430; --suave:#667085; --linea:#e4e0d6;
   --acento:#0f6e6a; --acento-suave:#d9eeec; --sube:#147a4b; --sube-f:#dff3e7; --baja:#b3401f; --baja-f:#fbe6dd;
-  --ocupado:#e9e6df; --bloqueo:#d3d0c8; --ambar:#b7791f; --sombra:0 1px 2px rgba(20,25,35,.06),0 4px 14px rgba(20,25,35,.05);
+  --ocupado:#e9e6df; --bloqueo:#d3d0c8; --ambar:#b7791f; --booking:#2f5fc4; --sombra:0 1px 2px rgba(20,25,35,.06),0 4px 14px rgba(20,25,35,.05);
 }
 @media (prefers-color-scheme: dark){:root{
   --fondo:#12161c; --panel:#1b212a; --tinta:#e8ebef; --suave:#98a2b3; --linea:#2c3440;
   --acento:#4fc3bb; --acento-suave:#173b3a; --sube:#5ed39a; --sube-f:#153526; --baja:#f09a7b; --baja-f:#40221a;
-  --ocupado:#262d38; --bloqueo:#323a47; --ambar:#e0b05a; --sombra:none;
+  --ocupado:#262d38; --bloqueo:#323a47; --ambar:#e0b05a; --booking:#8fb3f7; --sombra:none;
 }}
 *{box-sizing:border-box}
 body{margin:0;background:var(--fondo);color:var(--tinta);font:15px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif}
@@ -272,7 +272,7 @@ function detalle(r){
     <div class="cascada">${f}</div>
     ${orig ? `<p class="nota"><b>${orig}.</b></p>` : ""}
     ${d.notas.length ? `<p class="nota">${d.notas.map(esc).join(" · ")}</p>` : ""}
-    ${m ? `<p class="nota">Mercado esa noche (precio en Airbnb): P25 ${eur(m.p25)} · mediana ${eur(m.mediana)} · P75 ${eur(m.p75)} · ocupación estimada ${pct(m.ocupacion)}.<br>Nuestro precio en Airbnb sería ${eur(d.precio * r.indicadores.recargo_airbnb)}.</p>` : ""}
+    ${m ? `<p class="nota">Mercado esa noche (precio en Airbnb): P25 ${eur(m.p25)} · mediana ${eur(m.mediana)} · P75 ${eur(m.p75)} · ocupación estimada ${pct(m.ocupacion)}${m.ocupacion_booking != null ? ` (Airbnb ${pct(m.ocupacion_airbnb)}, Booking ${pct(m.ocupacion_booking)})` : ""}.<br>Nuestro precio en Airbnb sería ${eur(d.precio * r.indicadores.recargo_airbnb)}.</p>` : ""}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
       <button id="fijar">Fijar precio…</button><button id="notocar">No tocar esta fecha</button><button id="cerrar-det" class="solo-movil">Cerrar</button></div>`;
   el.classList.toggle("abierta", !!E.abierta);
@@ -316,6 +316,12 @@ function vistaReglas(c){
     <div class="rejilla campos" style="margin-top:12px">${marca("Freno de descuentos", R + "limites.freno_mercado.activa")}
       ${campo("Holgura bajo el percentil 25 (%)", R + "limites.freno_mercado.holgura_pct", 'min="0"')}</div>
     <p class="ayuda" style="margin-top:8px">Con el freno activo, si el precio ya queda por debajo del cuartil más barato de la competencia no se aplican descuentos por demanda floja ni por ir retrasado de reservas: bajar más no trae reservas y sí quita ingresos.</p></div>`));
+
+  c.append(h(`<div class="tarjeta"><h2>Booking <small>segunda fuente de demanda, vía RapidAPI</small></h2>
+    <p class="ayuda">Cada rastreo pregunta a Booking cuántos alojamientos del destino quedan libres en cada ventana de fechas. El plan gratuito da 500 consultas al mes, así que solo se consulta parte de las fechas (primero las cercanas).</p>
+    <div class="rejilla campos">${marca("Usar Booking", "mercado.booking.activa")}
+      ${campo("Peso de Booking en la demanda (0 a 1)", "mercado.booking.peso", 'min="0" max="1"')}
+      ${campo("Consultas por rastreo", "mercado.booking.consultas_por_rastreo", 'min="1" step="1"')}</div></div>`));
 
   c.append(h(`<div class="tarjeta"><h2>Antelación</h2>
     <p class="ayuda">Descuento gradual de última hora para las noches que siguen libres, y prima para las fechas lejanas (quien reserva con mucha antelación es menos sensible al precio y así no se malvenden las fechas buenas).</p>
@@ -416,11 +422,19 @@ function vistaMercado(c){
       if(i % 4 === 0) ejes += `<text x="${x(i)}" y="${H - 6}" font-size="11" text-anchor="middle" fill="var(--suave)">${v.llegada.slice(8)}/${v.llegada.slice(5,7)}</text>`; });
     [0, .5, 1].forEach(v => ejes += `<line x1="${ml}" x2="${W-40}" y1="${y(v)}" y2="${y(v)}" stroke="var(--linea)"/><text x="${ml-6}" y="${y(v)+4}" font-size="11" text-anchor="end" fill="var(--suave)">${v*100} %</text>`);
     ejes += `<text x="${W-36}" y="${yp(phi-5)+4}" font-size="11" fill="var(--ambar)">${Math.round(phi-5)} €</text><text x="${W-36}" y="${yp(plo+5)+4}" font-size="11" fill="var(--ambar)">${Math.round(plo+5)} €</text>`;
-    const n = m.nivel;
+    const n = m.nivel; const bk = m.booking || {}; let lineaB = "";
+    if(bk.ventanas && bk.ventanas.length){
+      const t0 = new Date(V[0].llegada).getTime(), t1 = new Date(V[V.length - 1].llegada).getTime();
+      const xf = f => ml + (W - ml - 40) * (new Date(f).getTime() - t0) / (t1 - t0);
+      const xi = V.map(v => new Date(v.llegada).getTime());
+      const xr = f => { const t = new Date(f).getTime(); let i = xi.findIndex(z => z >= t); if(i < 0) return x(V.length - 1); if(i === 0) return x(0); return x(i - 1) + (x(i) - x(i - 1)) * (t - xi[i - 1]) / (xi[i] - xi[i - 1]); };
+      bk.ventanas.forEach(v => { lineaB += (lineaB ? "L" : "M") + xr(v.llegada).toFixed(1) + " " + y(v.ocupacion).toFixed(1); });
+    }
     c.append(h(`<div class="tarjeta"><h2>Competencia de ${esc(r.apartamento.nombre)} <small>${m.anuncios} alojamientos comparables · rastreo del ${m.dia}</small></h2>
       <p class="ayuda">Precio habitual por noche de los comparables en Airbnb: P25 ${eur(n[25])} · mediana ${eur(n[50])} · P75 ${eur(n[75])}. Como mucho se han visto ${m.oferta} disponibles a la vez; la ocupación de cada fecha se estima frente a esa oferta.</p>
-      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ocupación y precio del mercado por fecha">${ejes}${barras}<path d="${linea}" fill="none" stroke="var(--ambar)" stroke-width="2"/></svg>
-      <div class="leyenda"><span><i style="background:var(--acento);height:9px;opacity:.55"></i>Ocupación estimada (verde: más demanda de lo normal; rojo: menos)</span><span><i style="background:var(--ambar)"></i>Mediana de precio por noche de lo que queda libre</span></div></div>`));
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ocupación y precio del mercado por fecha">${ejes}${barras}<path d="${linea}" fill="none" stroke="var(--ambar)" stroke-width="2"/>${lineaB ? `<path d="${lineaB}" fill="none" stroke="var(--booking)" stroke-width="2" stroke-dasharray="6 4"/>` : ""}</svg>
+      ${bk.ventanas && bk.ventanas.length ? `<p class="ayuda" style="margin:8px 0 0">Booking: ${bk.total} alojamientos en el destino, de los que como mucho se han visto ${bk.oferta} libres a la vez. La demanda de cada fecha combina Airbnb y Booking (peso de Booking: ${Math.round(bk.peso * 100)} %). Consultas de Booking que quedan este mes: ${bk.restantes ?? "—"}.</p>` : (bk.error ? `<p class="ayuda" style="margin:8px 0 0">Booking: sin datos (${esc(bk.error)}).</p>` : "")}
+      <div class="leyenda">${lineaB ? `<span><i style="background:var(--booking)"></i>Ocupación en Booking (todo el destino)</span>` : ""}<span><i style="background:var(--acento);height:9px;opacity:.55"></i>Ocupación estimada (verde: más demanda de lo normal; rojo: menos)</span><span><i style="background:var(--ambar)"></i>Mediana de precio por noche de lo que queda libre</span></div></div>`));
   });
 }
 

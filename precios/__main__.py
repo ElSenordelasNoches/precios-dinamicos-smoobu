@@ -7,6 +7,8 @@
               [--sin-escanear] [--aplicar] [--no-aplicar] [--rapido]
   resumen     Enseña el resumen de la última ejecución.
   panel       Abre el panel de configuración en el navegador.  [--puerto N]
+  booking-destino "Nombre"  Busca el identificador de un destino en Booking
+              (gasta una consulta de RapidAPI).
   clave-panel Fija la contraseña para entrar al panel desde fuera.
               [--host dominio] [--pedir]  (sin --pedir genera una y la deja
               en datos/clave_panel.txt)
@@ -43,7 +45,20 @@ def main(argv=None) -> int:
     cp = sub.add_parser("clave-panel")
     cp.add_argument("--host")
     cp.add_argument("--pedir", action="store_true")
+    bd = sub.add_parser("booking-destino")
+    bd.add_argument("nombre")
     a = p.parse_args(argv)
+
+    if a.orden == "booking-destino":
+        from . import booking
+        try:
+            for x in booking.buscar_destino(a.nombre):
+                print(f"  dest_id {x['dest_id']}  tipo {x['tipo']}  {x['nombre']}  ({x['alojamientos']} alojamientos)")
+        except booking.ErrorBooking as e:
+            print(f"No se ha podido consultar: {e}")
+            return 1
+        print('Ponga el elegido en config.json → mercado.booking.destino = {"dest_id": …, "tipo": "…"}')
+        return 0
 
     if a.orden == "clave-panel":
         import getpass

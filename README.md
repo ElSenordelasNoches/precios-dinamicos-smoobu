@@ -51,6 +51,16 @@ ahí salen la ocupación del mercado, el índice de precio de igual a igual y el
 ritmo de reservas. Las ventanas se anclan a una rejilla fija para que dos
 rastreos en días distintos midan exactamente las mismas estancias.
 
+**Booking.com** se añade como segunda fuente de demanda, pero no leyendo su web
+(no lo permite), sino con una API de RapidAPI que tiene plan gratuito (500
+consultas al mes). Una consulta por ventana de fechas devuelve cuántos
+alojamientos del destino quedan libres; con eso se mide su ocupación y se
+promedia con la de Airbnb. Para activarlo: cree una clave en RapidAPI,
+suscríbase al plan gratuito de la API «Booking» (apidojo), póngala en
+`secretos.json` (`"rapidapi": {"clave": "…"}`), busque su destino con
+`python -m precios booking-destino "Nombre"` y anótelo en
+`config.json` → `mercado.booking.destino`.
+
 Uso responsable: solo páginas públicas, sin iniciar sesión, con pausas entre
 consultas y unas decenas de ventanas por rastreo. Si el sitio pide parar
 (códigos 403 o 429), el rastreo se detiene. No se saltan protecciones contra
@@ -85,6 +95,8 @@ python -m precios panel
 | `python -m precios ejecutar` | Rastrea, calcula y, en modo automático, envía a Smoobu. Opciones: `--sin-escanear`, `--aplicar`, `--no-aplicar`, `--rapido`. |
 | `python -m precios resumen` | Resumen de la última ejecución. |
 | `python -m precios panel` | Abre el panel en `http://127.0.0.1:8777`. |
+| `python -m precios booking-destino "Nombre"` | Busca el identificador de un destino en Booking (gasta una consulta). |
+| `python -m precios clave-panel` | Fija la contraseña para entrar al panel desde fuera. |
 
 ## Seguridad
 

@@ -38,6 +38,10 @@ POR_DEFECTO = {
         "dias_validez": 6,
         # Rastreos anteriores que se combinan para estimar la oferta total.
         "rastreos_memoria": 10,
+        # Booking, vía RapidAPI (clave en secretos.json → "rapidapi"). El destino
+        # se busca con «python -m precios booking-destino "Nombre"».
+        "booking": {"activa": True, "destino": {}, "peso": 0.5,
+                    "consultas_por_rastreo": 28, "reserva_consultas": 5},
     },
     "apartamentos": [],
     "reglas": {
