@@ -1,0 +1,8 @@
+# Datos privados: nunca al repositorio
+secretos.json
+config.json
+datos/
+__pycache__/
+*.pyc
+*.tmp
+.claude/

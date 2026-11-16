@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Precios dinámicos</title>
+<style>
+:root{
+  --fondo:#f5f3ee; --panel:#ffffff; --tinta:#1d2430; --suave:#667085; --linea:#e4e0d6;
+  --acento:#0f6e6a; --acento-suave:#d9eeec; --sube:#147a4b; --sube-f:#dff3e7; --baja:#b3401f; --baja-f:#fbe6dd;
+  --ocupado:#e9e6df; --bloqueo:#d3d0c8; --ambar:#b7791f; --sombra:0 1px 2px rgba(20,25,35,.06),0 4px 14px rgba(20,25,35,.05);
+}
+@media (prefers-color-scheme: dark){:root{
+  --fondo:#12161c; --panel:#1b212a; --tinta:#e8ebef; --suave:#98a2b3; --linea:#2c3440;
+  --acento:#4fc3bb; --acento-suave:#173b3a; --sube:#5ed39a; --sube-f:#153526; --baja:#f09a7b; --baja-f:#40221a;
+  --ocupado:#262d38; --bloqueo:#323a47; --ambar:#e0b05a; --sombra:none;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--tinta);font:15px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif}
+header{position:sticky;top:0;z-index:20;background:var(--panel);border-bottom:1px solid var(--linea);padding:10px 20px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+header h1{font-size:17px;margin:0;font-weight:650;letter-spacing:-.01em}
+header .hueco{flex:1}
+.pastilla{font-size:12px;padding:3px 10px;border-radius:99px;border:1px solid var(--linea);color:var(--suave);white-space:nowrap}
+.pastilla.auto{background:var(--sube-f);color:var(--sube);border-color:transparent}
+.pastilla.sim{background:var(--acento-suave);color:var(--acento);border-color:transparent}
+.pastilla.aviso{background:var(--baja-f);color:var(--baja);border-color:transparent}
+button{font:inherit;border:1px solid var(--linea);background:var(--panel);color:var(--tinta);padding:7px 13px;border-radius:8px;cursor:pointer}
+button:hover{border-color:var(--acento)}
+button.primario{background:var(--acento);color:#fff;border-color:var(--acento)}
+@media (prefers-color-scheme: dark){button.primario{color:#06211f}}
+button.peligro{border-color:var(--baja);color:var(--baja)}
+button:disabled{opacity:.45;cursor:default}
+nav{display:flex;gap:4px;padding:10px 20px 0;flex-wrap:wrap}
+nav button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--suave);padding:8px 12px}
+nav button.activa{color:var(--tinta);border-bottom-color:var(--acento);font-weight:600}
+main{padding:16px 20px 60px;max-width:1280px;margin:0 auto}
+.tarjeta{background:var(--panel);border:1px solid var(--linea);border-radius:12px;padding:16px;box-shadow:var(--sombra);margin-bottom:16px}
+.tarjeta h2{font-size:14px;margin:0 0 10px;font-weight:650}
+.tarjeta h2 small{font-weight:400;color:var(--suave);margin-left:6px}
+.rejilla{display:grid;gap:12px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.kpi{background:var(--panel);border:1px solid var(--linea);border-radius:12px;padding:12px 14px;box-shadow:var(--sombra)}
+.kpi .n{font-size:12px;color:var(--suave)}
+.kpi .v{font-size:24px;font-weight:650;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:12px;color:var(--suave)}
+.campos{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));align-items:end}
+label{display:block;font-size:12px;color:var(--suave)}
+input[type=number],input[type=text],input[type=date],select{width:100%;margin-top:3px;font:inherit;padding:6px 8px;border:1px solid var(--linea);border-radius:7px;background:var(--fondo);color:var(--tinta)}
+input:focus,select:focus{outline:2px solid var(--acento);outline-offset:-1px}
+label.marca{display:flex;gap:7px;align-items:center;color:var(--tinta);font-size:14px}
+.ayuda{font-size:12.5px;color:var(--suave);margin:2px 0 10px;max-width:86ch}
+.meses{display:grid;grid-template-columns:repeat(12,minmax(52px,1fr));gap:6px;overflow-x:auto}
+.semana{display:grid;grid-template-columns:repeat(7,minmax(60px,1fr));gap:6px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--linea);vertical-align:middle}
+th{font-size:12px;color:var(--suave);font-weight:500}
+td input,td select{margin:0}
+.x{border:0;background:none;color:var(--baja);padding:2px 6px}
+svg{display:block;width:100%;height:auto}
+.leyenda{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--suave);margin-top:6px}
+.leyenda i{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:5px;border-radius:2px}
+.calendario{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.mes h3{font-size:13px;margin:0 0 5px;font-weight:600}
+.mes h3::first-letter,.cap::first-letter{text-transform:uppercase}
+.dias{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.dias .c{font-size:10px;color:var(--suave);text-align:center}
+.dia{aspect-ratio:1/1;border-radius:6px;border:1px solid var(--linea);padding:2px 3px;font-size:10px;line-height:1.15;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;background:var(--panel);min-width:0}
+.dia b{font-size:12.5px;font-variant-numeric:tabular-nums;font-weight:600}
+.dia span{color:var(--suave);display:flex;justify-content:space-between}
+.dia.R{background:var(--ocupado);color:var(--suave);cursor:default}
+.dia.B{background:var(--bloqueo);color:var(--suave)}
+.dia.sube{background:var(--sube-f);border-color:transparent}
+.dia.baja{background:var(--baja-f);border-color:transparent}
+.dia.sel{outline:2px solid var(--acento)}
+.dia.fijo b::after{content:" ●";font-size:8px;color:var(--ambar)}
+.dos{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+@media (max-width:980px){.dos{grid-template-columns:1fr}}
+.detalle{position:sticky;top:64px}
+.cascada{font-variant-numeric:tabular-nums;font-size:13.5px}
+.cascada div{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed var(--linea)}
+.cascada .tot{font-weight:650;border-bottom:0;font-size:15px}
+.pos{color:var(--sube)} .neg{color:var(--baja)}
+.avisos{background:var(--baja-f);color:var(--baja);border-radius:10px;padding:9px 13px;margin-bottom:14px;font-size:13.5px}
+.nota{font-size:12.5px;color:var(--suave)}
+#aviso-flotante{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--tinta);color:var(--fondo);padding:9px 16px;border-radius:9px;font-size:13.5px;display:none;z-index:50;max-width:90vw}
+</style>
+</head>
+<body>
+<header>
+  <h1>Precios dinámicos</h1>
+  <span id="modo" class="pastilla"></span>
+  <span id="info" class="pastilla"></span>
+  <span class="hueco"></span>
+  <button id="b-rastrear" title="Vuelve a leer el mercado en Airbnb (tarda unos minutos)">Rastrear mercado</button>
+  <button id="b-guardar" class="primario" disabled>Guardar cambios</button>
+  <button id="b-aplicar" class="peligro" title="Envía ahora mismo los precios calculados a Smoobu">Enviar a Smoobu</button>
+</header>
+<nav id="pestanas"></nav>
+<main id="contenido"></main>
+<div id="aviso-flotante"></div>
+<script>
+"use strict";
+const E = {cfg:null, res:null, pest:0, sel:null, sucio:false, cred:false};
+const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const DIAS = [["lun","L"],["mar","M"],["mie","X"],["jue","J"],["vie","V"],["sab","S"],["dom","D"]];
+const NOMBRES = {estacionalidad:"Estacionalidad", dia_semana:"Día de la semana", eventos:"Eventos y festivos",
+  demanda_mercado:"Demanda del mercado", antelacion:"Antelación", ritmo_ocupacion:"Ritmo de ocupación propio",
+  hueco:"Hueco entre reservas", ajuste_manual:"Ajuste manual", freno_mercado:"Freno de descuentos (ya bajo el mercado)"};
+const $ = (s, r=document) => r.querySelector(s);
+const h = (s) => { const t = document.createElement("template"); t.innerHTML = s.trim(); return t.content; };
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const eur = (v, d=0) => v == null ? "—" : Number(v).toLocaleString("es-ES", {minimumFractionDigits:d, maximumFractionDigits:d}) + " €";
+const pct = (v) => v == null ? "—" : Math.round(v * 100) + " %";
+const fechaLarga = (iso) => new Date(iso + "T12:00").toLocaleDateString("es-ES", {weekday:"long", day:"numeric", month:"long", year:"numeric"});
+
+function avisar(t, ms=3200){ const a=$("#aviso-flotante"); a.textContent=t; a.style.display="block"; clearTimeout(avisar.t); avisar.t=setTimeout(()=>a.style.display="none", ms); }
+async function api(ruta, cuerpo){
+  const r = await fetch(ruta, cuerpo === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json","X-Panel":"1"}, body:JSON.stringify(cuerpo)});
+  const j = await r.json();
+  if(!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+const leer = (o, ruta) => ruta.split(".").reduce((a, k) => a == null ? a : a[k], o);
+function poner(o, ruta, v){ const p = ruta.split("."); const u = p.pop(); p.reduce((a, k) => a[k] ??= {}, o)[u] = v; }
+
+async function cargar(){
+  const d = await api("/api/datos");
+  E.cfg = d.config; E.res = d.ultimo; E.cred = d.credenciales;
+  if(!E.res) await simular();
+  pintar();
+  if(d.rastreo.activo) seguirRastreo();
+}
+let tSim;
+function cambio(){ E.sucio = true; $("#b-guardar").disabled = false; clearTimeout(tSim); tSim = setTimeout(simular, 450); }
+async function simular(){
+  try{ E.res = await api("/api/simular", E.cfg); pintar(true); }
+  catch(e){ avisar("No se puede calcular: " + e.message, 6000); }
+}
+
+/* ---------- cabecera y pestañas ---------- */
+function pintar(conservar){
+  const foco = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.ruta : null;
+  const m = $("#modo"); const auto = E.cfg.modo === "automatico";
+  m.textContent = auto ? "Automático: envía a Smoobu" : "Simulación: no envía nada";
+  m.className = "pastilla " + (auto ? "auto" : "sim");
+  const i = $("#info");
+  i.textContent = E.res ? `Mercado: ${E.res.mercado_dia || "sin rastreo"} · calendario: ${E.res.origen_calendario === "smoobu" ? "Smoobu en directo" : "volcado inicial"}` : "";
+  $("#b-aplicar").disabled = !E.cred;
+  $("#b-aplicar").title = E.cred ? "Envía ahora mismo los precios calculados a Smoobu" : "Falta la clave de la API de Smoobu (secretos.json)";
+  const nombres = [...E.cfg.apartamentos.map(a => a.nombre), "Reglas", "Mercado"];
+  const nav = $("#pestanas"); nav.innerHTML = "";
+  nombres.forEach((n, k) => { const b = document.createElement("button"); b.textContent = n; b.className = k === E.pest ? "activa" : ""; b.onclick = () => { E.pest = k; E.sel = null; pintar(); }; nav.append(b); });
+  const c = $("#contenido"); const y = window.scrollY; c.innerHTML = "";
+  if(E.res && E.res.avisos && E.res.avisos.length) c.append(h(`<div class="avisos">${E.res.avisos.map(esc).join("<br>")}</div>`));
+  const na = E.cfg.apartamentos.length;
+  if(E.pest < na) vistaApartamento(c, E.pest);
+  else if(E.pest === na) vistaReglas(c);
+  else vistaMercado(c);
+  enlazar(c);
+  if(conservar){ window.scrollTo(0, y); if(foco){ const el = c.querySelector(`[data-ruta="${foco}"]`); if(el){ el.focus(); } } }
+}
+function enlazar(raiz){
+  raiz.querySelectorAll("[data-ruta]").forEach(el => {
+    const ruta = el.dataset.ruta; const v = leer(E.cfg, ruta);
+    if(el.type === "checkbox") el.checked = !!v; else el.value = v ?? "";
+    el.addEventListener("change", () => {
+      let n = el.type === "checkbox" ? el.checked : el.type === "number" ? (el.value === "" ? null : Number(el.value)) : el.value;
+      if(el.dataset.nulo && (n === "" || n === 0)) n = null;
+      poner(E.cfg, ruta, n); cambio();
+    });
+  });
+}
+const campo = (et, ruta, extra="") => `<label>${et}<input type="number" step="any" data-ruta="${ruta}" ${extra}></label>`;
+const marca = (et, ruta) => `<label class="marca"><input type="checkbox" data-ruta="${ruta}">${et}</label>`;
+
+/* ---------- apartamento ---------- */
+function vistaApartamento(c, k){
+  const a = E.cfg.apartamentos[k]; const r = E.res && E.res.apartamentos.find(x => x.apartamento.id == a.id);
+  if(!r){ c.append(h(`<div class="tarjeta">Sin datos de este apartamento todavía.</div>`)); return; }
+  const b = r.base, I = r.indicadores, m = r.mercado, rec = I.recargo_airbnb;
+  const kp = (n, v, d) => `<div class="kpi"><div class="n">${n}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
+  c.append(h(`<div class="rejilla kpis" style="margin-bottom:16px">
+    ${kp("Precio base en uso", eur(b.valor, b.valor % 1 ? 1 : 0), b.automatica ? `Configurado ${eur(b.configurada)} · autoajuste entre ${eur(b.suelo)} y ${eur(b.tope)}` : "Autoajuste desactivado")}
+    ${kp("Ocupación próximos 30 días", pct(I["30"].ocupacion), `Mercado ${pct(I["30"].ocupacion_mercado)} · a 90 días ${pct(I["90"].ocupacion)} (mercado ${pct(I["90"].ocupacion_mercado)})`)}
+    ${kp("Ocupación últimos 90 días", pct(I.ocupacion_pasada_90), `Último año ${pct(I.ocupacion_pasada_365)}`)}
+    ${kp("Precio medio noches libres (90 d)", `${eur(I["90"].precio_medio_actual)} → ${eur(I["90"].precio_medio_nuevo)}`, `${I.noches_que_cambian} noches cambian: ${I.suben} suben, ${I.bajan} bajan`)}
+    ${kp("Mercado · mediana por noche", m.disponible ? eur(m.nivel[50]) : "—", m.disponible ? `En Airbnb, ${m.anuncios} comparables. Nuestro precio allí: ${eur(b.valor * rec)}` : "Sin rastreo todavía")}
+  </div>`));
+  c.append(h(`<div class="tarjeta"><h2>Precio base <small>${esc(b.motivo)}</small></h2>
+    <div class="rejilla campos">
+      ${campo("Precio base (€)", `apartamentos.${k}.precio_base`, 'min="1"')}
+      ${campo("Precio mínimo (€)", `apartamentos.${k}.precio_minimo`, 'min="1"')}
+      ${campo("Precio máximo (€)", `apartamentos.${k}.precio_maximo`, 'min="1"')}
+      ${campo("Estancia mínima (noches)", `apartamentos.${k}.estancia_minima`, 'min="1" step="1"')}
+      ${campo("Dormitorios (para comparar)", `apartamentos.${k}.dormitorios`, 'min="0" step="1"')}
+      <label>N.º del anuncio en Airbnb<input type="text" data-ruta="apartamentos.${k}.airbnb_id" data-nulo="1" placeholder="opcional"></label>
+    </div>
+    <p class="nota" style="margin:10px 0 0">Los precios son los de Smoobu (precio base de la cuenta). Smoobu les añade después el recargo de cada portal (${Object.entries(E.cfg.reglas.canales).map(([n,v])=>`${n} +${v} %`).join(", ")}).${b.mercado_equivalente ? ` La mediana del mercado equivale a un precio base de ${eur(b.mercado_equivalente)}.` : ""}</p></div>`));
+  const t = document.createElement("div"); t.className = "tarjeta";
+  t.innerHTML = `<h2>Evolución del precio <small>próximos ${r.dias.length} días</small></h2>${grafico(r, rec)}
+    <div class="leyenda"><span><i style="background:var(--acento)"></i>Precio nuevo</span><span><i style="background:var(--suave)"></i>Precio vigente</span><span><i style="background:var(--ambar)"></i>Mediana del mercado (equivalente a nuestro precio base)</span><span><i style="background:var(--ocupado);height:9px"></i>Noches ya reservadas</span></div>`;
+  c.append(t);
+  const dos = document.createElement("div"); dos.className = "dos";
+  const cal = document.createElement("div"); cal.className = "tarjeta";
+  cal.innerHTML = `<h2>Calendario <small>precio nuevo y estancia mínima · verde sube, rojo baja, gris reservado</small></h2><div class="calendario">${calendario(r)}</div>`;
+  const det = document.createElement("div"); det.className = "tarjeta detalle"; det.id = "detalle";
+  dos.append(cal, det); c.append(dos);
+  cal.querySelectorAll(".dia[data-f]").forEach(el => el.onclick = () => { E.sel = el.dataset.f; cal.querySelectorAll(".sel").forEach(x => x.classList.remove("sel")); el.classList.add("sel"); detalle(r); });
+  if(!E.sel){ const p = r.dias.find(x => x.libre); E.sel = p ? p.fecha : r.dias[0].fecha; }
+  const s = cal.querySelector(`.dia[data-f="${E.sel}"]`); if(s) s.classList.add("sel");
+  detalle(r);
+}
+function grafico(r, rec){
+  const D = r.dias, W = 1000, H = 250, ml = 38, mb = 22, mt = 8, n = D.length;
+  const vals = []; D.forEach(d => { if(d.libre && d.precio) vals.push(d.precio); if(d.libre && d.actual) vals.push(d.actual); if(d.mercado && d.mercado.mediana) vals.push(d.mercado.mediana / rec); });
+  if(!vals.length) return "";
+  let lo = Math.min(...vals), hi = Math.max(...vals); lo = Math.floor((lo - 4) / 10) * 10; hi = Math.ceil((hi + 4) / 10) * 10;
+  const x = i => ml + (W - ml - 6) * i / (n - 1), y = v => mt + (H - mt - mb) * (1 - (v - lo) / (hi - lo));
+  const linea = (f) => { let s = "", pen = false; D.forEach((d, i) => { const v = f(d); if(v == null){ pen = false; return; } s += (pen ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1); pen = true; }); return s; };
+  let g = "";
+  for(let v = lo; v <= hi; v += (hi - lo) > 80 ? 20 : 10) g += `<line x1="${ml}" x2="${W-6}" y1="${y(v)}" y2="${y(v)}" stroke="var(--linea)"/><text x="${ml-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--suave)">${v}</text>`;
+  let bandas = "", ini = null;
+  D.forEach((d, i) => { const oc = !d.libre; if(oc && ini === null) ini = i; if((!oc || i === n - 1) && ini !== null){ const fin = oc ? i : i - 1; bandas += `<rect x="${x(ini) - 1.3}" y="${mt}" width="${x(fin) - x(ini) + 2.6}" height="${H - mt - mb}" fill="var(--ocupado)"/>`; ini = null; } });
+  let meses = ""; D.forEach((d, i) => { if(d.fecha.slice(8) === "01") meses += `<line x1="${x(i)}" x2="${x(i)}" y1="${H-mb}" y2="${H-mb+4}" stroke="var(--suave)"/><text x="${x(i)+3}" y="${H-6}" font-size="11" fill="var(--suave)">${MESES[+d.fecha.slice(5,7)-1]}</text>`; });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolución del precio por noche">${bandas}${g}${meses}
+    <path d="${linea(d => d.mercado && d.mercado.mediana ? d.mercado.mediana / rec : null)}" fill="none" stroke="var(--ambar)" stroke-width="1.6" stroke-dasharray="5 4"/>
+    <path d="${linea(d => d.libre ? d.actual : null)}" fill="none" stroke="var(--suave)" stroke-width="1.4"/>
+    <path d="${linea(d => d.libre ? d.precio : null)}" fill="none" stroke="var(--acento)" stroke-width="2.2"/></svg>`;
+}
+function calendario(r){
+  const porMes = {}; r.dias.forEach(d => (porMes[d.fecha.slice(0,7)] ??= []).push(d));
+  return Object.entries(porMes).map(([mes, dias]) => {
+    const primero = new Date(dias[0].fecha + "T12:00"); const hueco = (primero.getDay() + 6) % 7;
+    const nombre = primero.toLocaleDateString("es-ES", {month:"long", year:"numeric"});
+    let celdas = DIAS.map(d => `<div class="c">${d[1]}</div>`).join("") + "<div></div>".repeat(hueco);
+    celdas += dias.map(d => {
+      let cl = "dia " + (d.estado !== "L" ? d.estado : "");
+      if(d.libre && d.actual && d.precio > d.actual + .01) cl += " sube"; else if(d.libre && d.actual && d.precio < d.actual - .01) cl += " baja";
+      if(d.origen !== "motor") cl += " fijo";
+      const dif = d.libre && d.actual && Math.abs(d.precio - d.actual) > .01 ? `${d.precio > d.actual ? "+" : "−"}${Math.abs(Math.round(d.precio - d.actual))}` : "";
+      return `<div class="${cl}" data-f="${d.fecha}" title="${d.fecha}"><span>${+d.fecha.slice(8)}<i style="font-style:normal">${d.libre ? d.minimo + "n" : ""}</i></span><b>${d.precio == null ? "—" : Math.round(d.precio)}</b><span>${dif}</span></div>`;
+    }).join("");
+    return `<div class="mes"><h3>${nombre}</h3><div class="dias">${celdas}</div></div>`;
+  }).join("");
+}
+function detalle(r){
+  const d = r.dias.find(x => x.fecha === E.sel); const el = $("#detalle"); if(!d || !el) return;
+  const est = {L:"Libre", R:"Reservada", B:"Bloqueada"}[d.estado];
+  let f = `<div><span>Precio base</span><span>${eur(r.base.valor, 1)}</span></div>`;
+  for(const [k, v] of Object.entries(d.factores)) f += `<div><span>${NOMBRES[k] || k}</span><span class="${v >= 0 ? "pos" : "neg"}">${v > 0 ? "+" : ""}${v.toLocaleString("es-ES")} %</span></div>`;
+  f += `<div><span>Resultado de los factores</span><span>${eur(d.bruto, 2)}</span></div>`;
+  f += `<div class="tot"><span>Precio final</span><span>${eur(d.precio)}</span></div>`;
+  const orig = {fijo:"Precio fijado en el panel", no_tocar:"Fecha marcada como «no tocar»", manual_smoobu:"Precio cambiado a mano en Smoobu"}[d.origen];
+  const m = d.mercado;
+  el.innerHTML = `<h2 class="cap">${fechaLarga(d.fecha)}</h2>
+    <p class="nota" style="margin:0 0 8px">${est} · precio vigente ${eur(d.actual)} · estancia mínima ${d.minimo_actual ?? "—"} → <b>${d.minimo}</b> noches</p>
+    <div class="cascada">${f}</div>
+    ${orig ? `<p class="nota"><b>${orig}.</b></p>` : ""}
+    ${d.notas.length ? `<p class="nota">${d.notas.map(esc).join(" · ")}</p>` : ""}
+    ${m ? `<p class="nota">Mercado esa noche (precio en Airbnb): P25 ${eur(m.p25)} · mediana ${eur(m.mediana)} · P75 ${eur(m.p75)} · ocupación estimada ${pct(m.ocupacion)}.<br>Nuestro precio en Airbnb sería ${eur(d.precio * r.indicadores.recargo_airbnb)}.</p>` : ""}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+      <button id="fijar">Fijar precio…</button><button id="notocar">No tocar esta fecha</button></div>`;
+  $("#fijar").onclick = () => { const v = prompt(`Precio fijo para el ${d.fecha} (€):`, d.precio); if(v && !isNaN(parseFloat(v))) nuevoAjuste({desde:d.fecha, hasta:d.fecha, tipo:"precio_fijo", valor:parseFloat(v.replace(",", ".")), apartamentos:[r.apartamento.id], nota:"Fijado desde el calendario"}); };
+  $("#notocar").onclick = () => nuevoAjuste({desde:d.fecha, hasta:d.fecha, tipo:"no_tocar", valor:0, apartamentos:[r.apartamento.id], nota:"No tocar"});
+}
+function nuevoAjuste(a){ E.cfg.reglas.ajustes_manuales.push(a); cambio(); avisar("Ajuste añadido. Se ve y se edita en la pestaña Reglas."); }
+
+/* ---------- reglas ---------- */
+function vistaReglas(c){
+  const R = "reglas.";
+  c.append(h(`<div class="tarjeta"><h2>Modo y estrategia</h2>
+    <div class="rejilla campos">
+      <label>Modo<select data-ruta="modo"><option value="simulacion">Simulación (no envía nada)</option><option value="automatico">Automático (envía a Smoobu)</option></select></label>
+      <label>Estrategia<select data-ruta="estrategia"><option value="prudente">Prudente: prioriza llenar</option><option value="equilibrada">Equilibrada</option><option value="ambiciosa">Ambiciosa: prioriza precio</option></select></label>
+      ${campo("Horizonte (días)", "horizonte_dias", 'min="30" max="540" step="1"')}
+      ${campo("Cambio máximo por ejecución (%)", R + "limites.cambio_maximo_pct", 'min="0"')}
+      ${campo("Redondeo (€)", R + "limites.redondeo", 'min="0.5"')}
+    </div>
+    <p class="ayuda" style="margin-top:10px">La estrategia aumenta o reduce la fuerza de la demanda, del ritmo de ocupación, del descuento de última hora y de la prima de fechas lejanas. El cambio máximo evita saltos bruscos: un precio no se mueve más de ese porcentaje cada vez.</p>
+    ${marca("Respetar los precios que cambie a mano en Smoobu", R + "respetar_cambios_manuales")}</div>`));
+
+  c.append(h(`<div class="tarjeta"><h2>Estacionalidad <small>ajuste por mes sobre el precio base (%)</small></h2>
+    <div class="meses">${MESES.map((m, i) => `<label style="text-transform:capitalize">${m}<input type="number" step="any" data-ruta="${R}estacionalidad.meses.${i+1}"></label>`).join("")}</div>
+    <div class="rejilla campos" style="margin-top:12px">
+      <label>Fuente<select data-ruta="${R}estacionalidad.modo"><option value="mixta">Mixta: mi perfil + mercado</option><option value="manual">Solo mi perfil</option><option value="mercado">Solo mercado</option></select></label>
+      ${campo("Peso del mercado (0 a 1)", R + "estacionalidad.peso_mercado", 'min="0" max="1"')}
+    </div>
+    <p class="ayuda" style="margin-top:10px">El componente de mercado mide cuánto más caro o barato está cada competidor en cada fecha respecto a su propio precio habitual.</p></div>`));
+
+  c.append(h(`<div class="tarjeta"><h2>Día de la semana <small>ajuste por noche (%)</small></h2>
+    <div class="semana">${DIAS.map(d => `<label>${d[1]}<input type="number" step="any" data-ruta="${R}dia_semana.${d[0]}"></label>`).join("")}</div></div>`));
+
+  c.append(h(`<div class="tarjeta"><h2>Demanda del mercado</h2>
+    <p class="ayuda">Sube el precio de las fechas en las que la competencia está más ocupada de lo normal para esa antelación (o se está llenando más deprisa entre un rastreo y otro) y lo baja en las flojas.</p>
+    <div class="rejilla campos">${marca("Activa", R + "demanda_mercado.activa")}
+      ${campo("Sensibilidad (1 = normal)", R + "demanda_mercado.sensibilidad", 'min="0"')}
+      ${campo("Subida máxima (%)", R + "demanda_mercado.tope_subida_pct", 'min="0"')}
+      ${campo("Bajada máxima (%)", R + "demanda_mercado.tope_bajada_pct", 'min="0"')}</div>
+    <div class="rejilla campos" style="margin-top:12px">${marca("Freno de descuentos", R + "limites.freno_mercado.activa")}
+      ${campo("Holgura bajo el percentil 25 (%)", R + "limites.freno_mercado.holgura_pct", 'min="0"')}</div>
+    <p class="ayuda" style="margin-top:8px">Con el freno activo, si el precio ya queda por debajo del cuartil más barato de la competencia no se aplican descuentos por demanda floja ni por ir retrasado de reservas: bajar más no trae reservas y sí quita ingresos.</p></div>`));
+
+  c.append(h(`<div class="tarjeta"><h2>Antelación</h2>
+    <p class="ayuda">Descuento gradual de última hora para las noches que siguen libres, y prima para las fechas lejanas (quien reserva con mucha antelación es menos sensible al precio y así no se malvenden las fechas buenas).</p>
+    <div class="rejilla campos">${marca("Descuento de última hora", R + "ultima_hora.activa")}
+      ${campo("Empieza a (días)", R + "ultima_hora.dias", 'min="1" step="1"')}
+      ${campo("Descuento máximo (%)", R + "ultima_hora.descuento_max_pct", 'min="0"')}
+      ${marca("Prima de fechas lejanas", R + "antelacion_lejana.activa")}
+      ${campo("Desde (días)", R + "antelacion_lejana.desde_dias", 'min="0" step="1"')}
+      ${campo("Plena a (días)", R + "antelacion_lejana.plena_a_dias", 'min="1" step="1"')}
+      ${campo("Prima máxima (%)", R + "antelacion_lejana.prima_max_pct", 'min="0"')}
+      ${campo("Suelo lejano: desde (días)", R + "limites.minimo_lejano.desde_dias", 'min="0" step="1"')}
+      ${campo("Suelo lejano: % sobre la base", R + "limites.minimo_lejano.pct_sobre_base")}</div></div>`));
+
+  c.append(h(`<div class="tarjeta"><h2>Ritmo de ocupación propio</h2>
+    <p class="ayuda">Compara lo que ya tiene reservado alrededor de cada fecha con lo que debería tener a esa antelación para acabar en la ocupación objetivo. Si va por delante, sube; si va por detrás, baja.</p>
+    <div class="rejilla campos">${marca("Activo", R + "ritmo_ocupacion.activa")}
+      ${campo("Ocupación objetivo (%)", R + "ritmo_ocupacion.objetivo_ocupacion_pct", 'min="30" max="100"')}
+      ${campo("Ventana (días)", R + "ritmo_ocupacion.ventana_dias", 'min="5" step="1"')}
+      ${campo("Sensibilidad", R + "ritmo_ocupacion.sensibilidad", 'min="0"')}
+      ${campo("Subida máxima (%)", R + "ritmo_ocupacion.tope_subida_pct", 'min="0"')}
+      ${campo("Bajada máxima (%)", R + "ritmo_ocupacion.tope_bajada_pct", 'min="0"')}</div></div>`));
+
+  c.append(h(`<div class="tarjeta"><h2>Autoajuste del precio base</h2>
+    <p class="ayuda">Si el apartamento se llena y está por debajo del mercado, el precio base sube poco a poco; si se queda vacío, baja. Nunca se sale del margen indicado respecto al precio base que usted fija.</p>
+    <div class="rejilla campos">${marca("Activo", R + "base_automatica.activa")}
+      ${campo("Paso máximo (%)", R + "base_automatica.paso_max_pct", 'min="0"')}
+      ${campo("Cada cuántos días", R + "base_automatica.cada_dias", 'min="1" step="1"')}
+      ${campo("Margen sobre mi base (± %)", R + "base_automatica.margen_pct", 'min="0"')}
+      ${campo("Percentil del mercado al que apuntar", R + "base_automatica.percentil_mercado", 'min="10" max="90" step="5"')}</div></div>`));
+
+  const hu = E.cfg.reglas.huecos.reglas;
+  c.append(h(`<div class="tarjeta"><h2>Huecos entre reservas y estancia mínima</h2>
+    <p class="ayuda">Un hueco más corto que la estancia mínima no se puede vender: la herramienta baja la estancia mínima de esas noches a la medida del hueco y aplica el ajuste de la primera regla que encaje.</p>
+    <div class="rejilla campos">${marca("Tratar los huecos", R + "huecos.activa")}${marca("Ajustar la estancia mínima al hueco", R + "huecos.ajustar_estancia_minima")}
+      ${campo("Última hora: a menos de (días)", R + "estancia_minima.ultima_hora_dias", 'min="0" step="1"')}
+      ${campo("…estancia mínima de (noches)", R + "estancia_minima.ultima_hora_noches", 'min="0" step="1"')}
+      ${campo("Fechas lejanas: desde (días)", R + "estancia_minima.lejana_desde_dias", 'min="0" step="1"')}
+      ${campo("…estancia mínima de (noches)", R + "estancia_minima.lejana_noches", 'min="0" step="1"')}</div>
+    <table style="margin-top:12px"><thead><tr><th>Hueco de hasta (noches)</th><th>Con antelación de al menos (días)</th><th>Ajuste (%)</th><th></th></tr></thead><tbody>
+    ${hu.map((_, i) => `<tr><td><input type="number" step="1" min="1" data-ruta="${R}huecos.reglas.${i}.noches_max"></td><td><input type="number" step="1" min="0" data-ruta="${R}huecos.reglas.${i}.antelacion_min"></td><td><input type="number" step="any" data-ruta="${R}huecos.reglas.${i}.ajuste_pct"></td><td><button class="x" data-quitar="huecos.reglas" data-i="${i}">quitar</button></td></tr>`).join("")}
+    </tbody></table><button style="margin-top:8px" data-anadir="hueco">Añadir regla</button></div>`));
+
+  const ev = E.cfg.reglas.eventos;
+  const auto = (E.res && E.res.eventos_verificados) || [];
+  c.append(h(`<div class="tarjeta"><h2>Eventos y festivos</h2>
+    <p class="ayuda">Navidad, Semana Santa y los puentes nacionales se calculan solos. Las fiestas locales y eventos con fecha variable los añade la revisión periódica tras comprobar las fechas${auto.length ? ` (ahora mismo: ${auto.map(e => esc(e.nombre)).join(", ")})` : ""}. Aquí puede añadir los suyos.</p>
+    ${marca("Festivos automáticos", R + "festivos_automaticos")}
+    <table style="margin-top:10px"><thead><tr><th>Nombre</th><th>Desde</th><th>Hasta</th><th>Ajuste (%)</th><th>Estancia mínima</th><th></th></tr></thead><tbody>
+    ${ev.map((_, i) => `<tr><td><input type="text" data-ruta="${R}eventos.${i}.nombre"></td><td><input type="date" data-ruta="${R}eventos.${i}.desde"></td><td><input type="date" data-ruta="${R}eventos.${i}.hasta"></td><td><input type="number" step="any" data-ruta="${R}eventos.${i}.ajuste_pct"></td><td><input type="number" step="1" min="0" data-nulo="1" data-ruta="${R}eventos.${i}.estancia_minima"></td><td><button class="x" data-quitar="eventos" data-i="${i}">quitar</button></td></tr>`).join("")}
+    </tbody></table><button style="margin-top:8px" data-anadir="evento">Añadir evento</button></div>`));
+
+  const am = E.cfg.reglas.ajustes_manuales; const aps = E.cfg.apartamentos;
+  c.append(h(`<div class="tarjeta"><h2>Ajustes manuales por fechas</h2>
+    <p class="ayuda">Para fijar un precio, sumar o restar un porcentaje, o impedir que la herramienta toque unas fechas concretas.</p>
+    <table><thead><tr><th>Desde</th><th>Hasta</th><th>Tipo</th><th>Valor</th><th>Estancia mínima</th><th>Apartamento</th><th>Nota</th><th></th></tr></thead><tbody>
+    ${am.map((a, i) => `<tr><td><input type="date" data-ruta="${R}ajustes_manuales.${i}.desde"></td><td><input type="date" data-ruta="${R}ajustes_manuales.${i}.hasta"></td>
+      <td><select data-ruta="${R}ajustes_manuales.${i}.tipo"><option value="precio_fijo">Precio fijo (€)</option><option value="porcentaje">Porcentaje (%)</option><option value="no_tocar">No tocar</option></select></td>
+      <td><input type="number" step="any" data-ruta="${R}ajustes_manuales.${i}.valor"></td><td><input type="number" step="1" min="0" data-nulo="1" data-ruta="${R}ajustes_manuales.${i}.estancia_minima"></td>
+      <td><select data-apto="${i}"><option value="">Todos</option>${aps.map(p => `<option value="${p.id}" ${(a.apartamentos || []).length === 1 && a.apartamentos[0] == p.id ? "selected" : ""}>${esc(p.nombre)}</option>`).join("")}</select></td>
+      <td><input type="text" data-ruta="${R}ajustes_manuales.${i}.nota"></td><td><button class="x" data-quitar="ajustes_manuales" data-i="${i}">quitar</button></td></tr>`).join("")}
+    </tbody></table><button style="margin-top:8px" data-anadir="ajuste">Añadir ajuste</button></div>`));
+
+  c.append(h(`<div class="tarjeta"><h2>Recargos de los portales en Smoobu <small>solo para comparar con el mercado</small></h2>
+    <div class="rejilla campos">${Object.keys(E.cfg.reglas.canales).map(n => campo(n[0].toUpperCase() + n.slice(1) + " (%)", R + "canales." + n)).join("")}</div></div>`));
+
+  const hoy = new Date().toISOString().slice(0, 10);
+  c.querySelectorAll("[data-anadir]").forEach(b => b.onclick = () => {
+    const t = b.dataset.anadir;
+    if(t === "hueco") E.cfg.reglas.huecos.reglas.push({noches_max:2, antelacion_min:0, ajuste_pct:0});
+    if(t === "evento") E.cfg.reglas.eventos.push({nombre:"Nuevo evento", desde:hoy, hasta:hoy, ajuste_pct:10});
+    if(t === "ajuste") E.cfg.reglas.ajustes_manuales.push({desde:hoy, hasta:hoy, tipo:"porcentaje", valor:0, apartamentos:null, nota:""});
+    cambio(); pintar(true);
+  });
+  c.querySelectorAll("[data-quitar]").forEach(b => b.onclick = () => { leer(E.cfg.reglas, b.dataset.quitar).splice(+b.dataset.i, 1); cambio(); pintar(true); });
+  c.querySelectorAll("[data-apto]").forEach(s => s.onchange = () => { E.cfg.reglas.ajustes_manuales[+s.dataset.apto].apartamentos = s.value ? [Number(s.value)] : null; cambio(); });
+}
+
+/* ---------- mercado ---------- */
+function vistaMercado(c){
+  const rs = (E.res && E.res.apartamentos) || [];
+  if(!rs.length || !rs[0].mercado.disponible){ c.append(h(`<div class="tarjeta">Todavía no hay ningún rastreo del mercado. Pulse «Rastrear mercado».</div>`)); return; }
+  rs.forEach(r => {
+    const m = r.mercado, V = m.ventanas, W = 1000, H = 220, ml = 38, mb = 22, mt = 8;
+    const x = i => ml + (W - ml - 40) * i / (V.length - 1), y = v => mt + (H - mt - mb) * (1 - v);
+    const ps = V.map(v => v.mediana).filter(Boolean); const plo = Math.min(...ps) - 5, phi = Math.max(...ps) + 5; const yp = v => mt + (H - mt - mb) * (1 - (v - plo) / (phi - plo));
+    let barras = "", linea = "", ejes = "";
+    V.forEach((v, i) => { const al = (H - mt - mb) * (v.ocupacion || 0); barras += `<rect x="${x(i) - 5}" y="${H - mb - al}" width="10" height="${al}" rx="2" fill="${v.desviacion > .08 ? "var(--sube)" : v.desviacion < -.08 ? "var(--baja)" : "var(--acento)"}" opacity=".55"><title>${v.llegada}: ocupación ${Math.round((v.ocupacion||0)*100)} %, ${v.n} disponibles, mediana ${v.mediana} €</title></rect>`;
+      if(v.mediana) linea += (linea ? "L" : "M") + x(i).toFixed(1) + " " + yp(v.mediana).toFixed(1);
+      if(i % 4 === 0) ejes += `<text x="${x(i)}" y="${H - 6}" font-size="11" text-anchor="middle" fill="var(--suave)">${v.llegada.slice(8)}/${v.llegada.slice(5,7)}</text>`; });
+    [0, .5, 1].forEach(v => ejes += `<line x1="${ml}" x2="${W-40}" y1="${y(v)}" y2="${y(v)}" stroke="var(--linea)"/><text x="${ml-6}" y="${y(v)+4}" font-size="11" text-anchor="end" fill="var(--suave)">${v*100} %</text>`);
+    ejes += `<text x="${W-36}" y="${yp(phi-5)+4}" font-size="11" fill="var(--ambar)">${Math.round(phi-5)} €</text><text x="${W-36}" y="${yp(plo+5)+4}" font-size="11" fill="var(--ambar)">${Math.round(plo+5)} €</text>`;
+    const n = m.nivel;
+    c.append(h(`<div class="tarjeta"><h2>Competencia de ${esc(r.apartamento.nombre)} <small>${m.anuncios} alojamientos comparables · rastreo del ${m.dia}</small></h2>
+      <p class="ayuda">Precio habitual por noche de los comparables en Airbnb: P25 ${eur(n[25])} · mediana ${eur(n[50])} · P75 ${eur(n[75])}. Como mucho se han visto ${m.oferta} disponibles a la vez; la ocupación de cada fecha se estima frente a esa oferta.</p>
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ocupación y precio del mercado por fecha">${ejes}${barras}<path d="${linea}" fill="none" stroke="var(--ambar)" stroke-width="2"/></svg>
+      <div class="leyenda"><span><i style="background:var(--acento);height:9px;opacity:.55"></i>Ocupación estimada (verde: más demanda de lo normal; rojo: menos)</span><span><i style="background:var(--ambar)"></i>Mediana de precio por noche de lo que queda libre</span></div></div>`));
+  });
+}
+
+/* ---------- acciones ---------- */
+$("#b-guardar").onclick = async () => {
+  try{ E.res = await api("/api/config", E.cfg); E.sucio = false; $("#b-guardar").disabled = true; pintar(true); avisar("Configuración guardada."); }
+  catch(e){ avisar("No se ha guardado: " + e.message, 7000); }
+};
+$("#b-aplicar").onclick = async () => {
+  if(E.sucio){ avisar("Guarde primero los cambios."); return; }
+  const n = E.res.apartamentos.map(r => `${r.apartamento.nombre}: ${r.indicadores.noches_que_cambian} noches`).join("\n");
+  if(!confirm("Se van a enviar a Smoobu los precios y estancias mínimas calculados. Smoobu los repartirá a Airbnb, Booking y demás portales.\n\n" + n + "\n\n¿Continuar?")) return;
+  try{ const s = await api("/api/aplicar", {confirmar:true}); E.res = s; pintar(true);
+    avisar(s.aplicado ? "Precios enviados a Smoobu y verificados." : "No se ha enviado: " + (s.bloqueado_por || []).join("; "), 8000); }
+  catch(e){ avisar("Error al enviar: " + e.message, 8000); }
+};
+$("#b-rastrear").onclick = async () => { try{ await api("/api/escanear", {}); seguirRastreo(); }catch(e){ avisar(e.message); } };
+async function seguirRastreo(){
+  const b = $("#b-rastrear"); b.disabled = true;
+  const t = setInterval(async () => {
+    const d = await api("/api/datos"); const r = d.rastreo;
+    b.textContent = r.activo ? "Rastreando…" + (r.lineas.length ? " " + (r.lineas.at(-1).match(/\[\d+\/\d+\]/) || [""])[0] : "") : "Rastrear mercado";
+    if(!r.activo){ clearInterval(t); b.disabled = false; avisar(r.error ? "El rastreo ha fallado: " + r.error : "Rastreo terminado."); await simular(); }
+  }, 4000);
+}
+window.addEventListener("beforeunload", e => { if(E.sucio){ e.preventDefault(); e.returnValue = ""; } });
+cargar().catch(e => { $("#contenido").innerHTML = `<div class="tarjeta">No se ha podido cargar: ${esc(e.message)}</div>`; });
+</script>
+</body>
+</html>

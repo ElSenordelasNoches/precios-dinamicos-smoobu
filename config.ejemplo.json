@@ -1,0 +1,31 @@
+{
+  "modo": "simulacion",
+  "horizonte_dias": 365,
+  "estrategia": "equilibrada",
+  "mercado": {
+    "lugar": "Puerto-del-Rosario--Las-Palmas--España",
+    "caja": {"sw_lat": 28.482, "sw_lng": -13.885, "ne_lat": 28.52, "ne_lng": -13.84}
+  },
+  "apartamentos": [
+    {
+      "id": 111111,
+      "nombre": "Apartamento de ejemplo",
+      "dormitorios": 1,
+      "precio_base": 60,
+      "precio_minimo": 45,
+      "precio_maximo": 120,
+      "estancia_minima": 3,
+      "airbnb_id": null
+    }
+  ],
+  "reglas": {
+    "canales": {"airbnb": 15, "booking": 18},
+    "eventos": [
+      {"nombre": "Fiestas locales", "desde": "2027-10-01", "hasta": "2027-10-10", "ajuste_pct": 8}
+    ],
+    "ajustes_manuales": [
+      {"desde": "2027-08-01", "hasta": "2027-08-15", "tipo": "porcentaje", "valor": 5,
+       "apartamentos": null, "nota": "Agosto fuerte"}
+    ]
+  }
+}
