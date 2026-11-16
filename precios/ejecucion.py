@@ -114,6 +114,7 @@ def aplicar(cfg: dict, salida: dict, cliente, hoy: dt.date) -> dict:
     estado = _leer(RUTA_ESTADO, {})
     estado.setdefault("enviados", {})
     estado.setdefault("base", {})
+    estado.setdefault("referencia", {})
     informe = {"enviado": {}, "verificacion": {}}
     for r in salida["apartamentos"]:
         a = r["apartamento"]
@@ -122,6 +123,9 @@ def aplicar(cfg: dict, salida: dict, cliente, hoy: dt.date) -> dict:
         if ops:
             cliente.enviar_tarifas(int(a["id"]), smoobu.agrupar_operaciones(ops))
         informe["enviado"][a["nombre"]] = len(ops)
+        if (estado["referencia"].get(clave) or {}).get("dia") != hoy.isoformat():
+            estado["referencia"][clave] = {"dia": hoy.isoformat(), "precios": {
+                x["fecha"]: x["actual"] for x in r["dias"] if x["actual"] is not None}}
         # Lo que queda vigente (enviado ahora o ya coincidente) se anota para
         # detectar después los cambios hechos a mano en Smoobu.
         registro = {x["fecha"]: [x["precio"], x["minimo"]] for x in r["dias"]

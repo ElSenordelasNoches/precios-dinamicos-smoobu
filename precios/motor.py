@@ -165,11 +165,18 @@ def calcular(cfg: dict, apto: dict, cal: Calendario, modelo, hoy: dt.date,
     ajustes = [a for a in reglas.get("ajustes_manuales") or []
                if not a.get("apartamentos") or apto["id"] in a["apartamentos"]]
     enviados = (estado.get("enviados") or {}).get(str(apto["id"])) or {}
+    # El cambio máximo se mide contra el precio que había al empezar el día, para
+    # que repetir la ejecución el mismo día no vuelva a mover los precios.
+    ref_dia = (estado.get("referencia") or {}).get(str(apto["id"])) or {}
+    referencia = ref_dia.get("precios", {}) if ref_dia.get("dia") == hoy.isoformat() else {}
 
     est, dsem, dem = reglas["estacionalidad"], reglas["dia_semana"], reglas["demanda_mercado"]
     uh, lej, rit, hue = (reglas["ultima_hora"], reglas["antelacion_lejana"],
                          reglas["ritmo_ocupacion"], reglas["huecos"])
     emin, lim = reglas["estancia_minima"], reglas["limites"]
+    ec = reglas.get("estancias_cortas") or {}
+    limpieza = float(ec.get("coste_limpieza", 0))
+    beneficio_min = float(ec.get("beneficio_minimo_reserva", 0))
     objetivo = rit["objetivo_ocupacion_pct"] / 100
     media = max(1, int(rit["ventana_dias"]) // 2)
     recargo = 1 + reglas["canales"].get("airbnb", 0) / 100
@@ -233,7 +240,8 @@ def calcular(cfg: dict, apto: dict, cal: Calendario, modelo, hoy: dt.date,
         hueco = cal.hueco(d, hoy, fin) if libre else None
         es_hueco_corto = hue["activa"] and hueco is not None and hueco < max(min_defecto, 4)
         f["ritmo_ocupacion"] = 0.0
-        if rit["activa"] and not es_hueco_corto:
+        retrasado = False
+        if not es_hueco_corto:
             a, b = max(hoy, d - media * UN_DIA), min(fin, d + (media + 1) * UN_DIA)
             occ = cal.ocupacion(a, b)
             if occ is not None:
@@ -243,9 +251,11 @@ def calcular(cfg: dict, apto: dict, cal: Calendario, modelo, hoy: dt.date,
                     n += 1
                     x += UN_DIA
                 dif = occ - esperado / n
-                tope = rit["tope_subida_pct"] * (0.5 if antel > 90 else 1.0)
-                f["ritmo_ocupacion"] = _acotar(rit["sensibilidad"] * estr["ritmo"] * 60 * dif,
-                                               -rit["tope_bajada_pct"], tope)
+                retrasado = dif < -0.05
+                if rit["activa"]:
+                    tope = rit["tope_subida_pct"] * (0.5 if antel > 90 else 1.0)
+                    f["ritmo_ocupacion"] = _acotar(rit["sensibilidad"] * estr["ritmo"] * 60 * dif,
+                                                   -rit["tope_bajada_pct"], tope)
 
         # 7. Huecos entre reservas
         f["hueco"] = 0.0
@@ -273,6 +283,45 @@ def calcular(cfg: dict, apto: dict, cal: Calendario, modelo, hoy: dt.date,
             if aj.get("nota"):
                 notas.append(aj["nota"])
 
+        # 9. Estancia mínima de la noche
+        minimo = min_defecto
+        for t in emin.get("temporadas") or []:
+            if _en_rango(d, t):
+                minimo = int(t["noches"])
+        if emin.get("lejana_desde_dias") and emin.get("lejana_noches") and antel >= emin["lejana_desde_dias"]:
+            minimo = max(minimo, int(emin["lejana_noches"]))
+        if ev_min:
+            minimo = max(minimo, ev_min)
+        normal = minimo  # la estancia mínima «de catálogo» para esa fecha
+        if emin.get("ultima_hora_noches") and antel <= emin.get("ultima_hora_dias", -1):
+            minimo = min(minimo, int(emin["ultima_hora_noches"]))
+        # Noches libres que no son hueco: al acercarse la fecha se admiten
+        # estancias más cortas (si se va retrasado de reservas, o siempre, según la regla).
+        relajada = False
+        if ec.get("activa") and libre and not es_hueco_corto and not ev_min:
+            for regla in sorted(ec.get("relajacion") or [], key=lambda r_: r_["antelacion_max"]):
+                if antel <= regla["antelacion_max"] and (retrasado or not regla.get("solo_si_retraso")):
+                    if int(regla["noches"]) < minimo:
+                        minimo, relajada = int(regla["noches"]), True
+                    break
+        if hue["activa"] and hue.get("ajustar_estancia_minima") and hueco is not None:
+            minimo = min(minimo, hueco)
+        if manual_min:
+            minimo = manual_min
+        minimo = max(1, minimo)
+
+        # 10. Recargo por estancia corta: quien se queda menos noches reparte la
+        # limpieza entre menos noches. Solo en noches abiertas a estancias cortas
+        # que no son hueco (los huecos ya llevan su propia regla).
+        f["estancia_corta"] = 0.0
+        if relajada and minimo < normal:
+            previo = base
+            for v in f.values():
+                previo *= 1 + v / 100
+            extra = limpieza * (1 / minimo - 1 / normal)
+            f["estancia_corta"] = extra / previo * 100
+            notas.append("Admite %d noche%s con recargo de limpieza" % (minimo, "" if minimo == 1 else "s"))
+
         bruto = base
         for v in f.values():
             bruto *= 1 + v / 100
@@ -294,7 +343,7 @@ def calcular(cfg: dict, apto: dict, cal: Calendario, modelo, hoy: dt.date,
                 bruto = objetivo_freno
                 notas.append("Ya está por debajo del mercado: no se descuenta más")
 
-        # 9. Límites
+        # 11. Límites
         suelo, techo = pmin, pmax
         ml = lim.get("minimo_lejano") or {}
         if ml and antel >= ml.get("desde_dias", 10**6):
@@ -303,36 +352,26 @@ def calcular(cfg: dict, apto: dict, cal: Calendario, modelo, hoy: dt.date,
             if _en_rango(d, t):
                 suelo = float(t.get("minimo", suelo))
                 techo = float(t.get("maximo", techo))
-        suelo = min(suelo, techo)
+        # Ninguna reserva puede dejar menos que la limpieza más el beneficio mínimo.
+        suelo_reserva = (limpieza + beneficio_min) / minimo if ec.get("activa") else 0.0
+        por_limpieza = suelo_reserva > suelo
+        suelo = min(max(suelo, suelo_reserva), techo)
         precio = _acotar(bruto, suelo, techo)
         if precio != bruto:
-            notas.append("Tope máximo" if bruto > techo else "Suelo mínimo")
+            notas.append("Tope máximo" if bruto > techo else
+                         ("Mínimo para cubrir limpieza y beneficio" if por_limpieza else "Suelo mínimo"))
 
-        # 10. Cambio máximo respecto al precio vigente
+        # 12. Cambio máximo respecto al precio vigente
         cmax = float(lim.get("cambio_maximo_pct") or 0)
         if cmax and actual and libre and not es_hueco_corto:
-            acotado = _acotar(precio, actual * (1 - cmax / 100), actual * (1 + cmax / 100))
+            partida = float(referencia.get(d.isoformat()) or actual)
+            acotado = _acotar(precio, partida * (1 - cmax / 100), partida * (1 + cmax / 100))
             if abs(acotado - precio) > 0.01:
                 notas.append(f"Cambio limitado al {cmax:.0f} % por ejecución")
-                precio = _acotar(acotado, pmin, pmax)
+                precio = _acotar(acotado, min(max(pmin, suelo_reserva), pmax), pmax)
         precio = round(precio / redondeo) * redondeo
-
-        # Estancia mínima
-        minimo = min_defecto
-        for t in emin.get("temporadas") or []:
-            if _en_rango(d, t):
-                minimo = int(t["noches"])
-        if emin.get("lejana_desde_dias") and emin.get("lejana_noches") and antel >= emin["lejana_desde_dias"]:
-            minimo = max(minimo, int(emin["lejana_noches"]))
-        if ev_min:
-            minimo = max(minimo, ev_min)
-        if emin.get("ultima_hora_noches") and antel <= emin.get("ultima_hora_dias", -1):
-            minimo = min(minimo, int(emin["ultima_hora_noches"]))
-        if hue["activa"] and hue.get("ajustar_estancia_minima") and hueco is not None:
-            minimo = min(minimo, hueco)
-        if manual_min:
-            minimo = manual_min
-        minimo = max(1, minimo)
+        if precio < min(suelo_reserva, pmax):
+            precio = math.ceil(suelo_reserva / redondeo) * redondeo
 
         # Precios fijados a mano (en el panel o directamente en Smoobu)
         origen = "motor"

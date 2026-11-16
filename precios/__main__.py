@@ -7,6 +7,9 @@
               [--sin-escanear] [--aplicar] [--no-aplicar] [--rapido]
   resumen     Enseña el resumen de la última ejecución.
   panel       Abre el panel de configuración en el navegador.  [--puerto N]
+  clave-panel Fija la contraseña para entrar al panel desde fuera.
+              [--host dominio] [--pedir]  (sin --pedir genera una y la deja
+              en datos/clave_panel.txt)
 """
 from __future__ import annotations
 
@@ -37,7 +40,31 @@ def main(argv=None) -> int:
     sub.add_parser("resumen")
     pa = sub.add_parser("panel"); pa.add_argument("--puerto", type=int, default=8777)
     pa.add_argument("--sin-navegador", action="store_true")
+    cp = sub.add_parser("clave-panel")
+    cp.add_argument("--host")
+    cp.add_argument("--pedir", action="store_true")
     a = p.parse_args(argv)
+
+    if a.orden == "clave-panel":
+        import getpass
+        import secrets
+        from . import panel
+        if a.pedir:
+            clave = getpass.getpass("Nueva contraseña del panel: ")
+            if len(clave) < 10 or clave != getpass.getpass("Repítala: "):
+                print("No coinciden o tiene menos de 10 caracteres. No se ha cambiado nada.")
+                return 1
+            panel.fijar_clave(clave, a.host)
+            print("Contraseña guardada.")
+        else:
+            letras = "abcdefghjkmnpqrstuvwxyz23456789"
+            clave = "-".join("".join(secrets.choice(letras) for _ in range(5)) for _ in range(4))
+            panel.fijar_clave(clave, a.host)
+            ruta = config.DATOS / "clave_panel.txt"
+            ruta.parent.mkdir(exist_ok=True)
+            ruta.write_text(clave + "\n", encoding="utf-8")
+            print(f"Contraseña generada y guardada en {ruta}. Apúntela y borre ese archivo.")
+        return 0
 
     if a.orden == "panel":
         from . import panel

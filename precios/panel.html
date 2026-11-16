@@ -82,6 +82,19 @@ svg{display:block;width:100%;height:auto}
 .pos{color:var(--sube)} .neg{color:var(--baja)}
 .avisos{background:var(--baja-f);color:var(--baja);border-radius:10px;padding:9px 13px;margin-bottom:14px;font-size:13.5px}
 .nota{font-size:12.5px;color:var(--suave)}
+.tarjeta{overflow-x:auto}
+.solo-movil{display:none}
+@media (max-width:980px){
+  header{padding:8px 12px;gap:8px} header h1{font-size:15px} header button{padding:6px 9px;font-size:13.5px}
+  #info{display:none} nav{padding:6px 8px 0;overflow-x:auto;flex-wrap:nowrap} nav button{white-space:nowrap}
+  main{padding:12px 10px 80px} .tarjeta{padding:12px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .kpi .v{font-size:19px}
+  .calendario{grid-template-columns:1fr}
+  .detalle{position:fixed;left:0;right:0;bottom:0;top:auto;max-height:62vh;overflow:auto;z-index:30;margin:0;border-radius:16px 16px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.25);display:none}
+  .detalle.abierta{display:block}
+  .solo-movil{display:inline-block}
+  table{min-width:520px}
+}
 #aviso-flotante{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--tinta);color:var(--fondo);padding:9px 16px;border-radius:9px;font-size:13.5px;display:none;z-index:50;max-width:90vw}
 </style>
 </head>
@@ -105,7 +118,7 @@ const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov"
 const DIAS = [["lun","L"],["mar","M"],["mie","X"],["jue","J"],["vie","V"],["sab","S"],["dom","D"]];
 const NOMBRES = {estacionalidad:"Estacionalidad", dia_semana:"Día de la semana", eventos:"Eventos y festivos",
   demanda_mercado:"Demanda del mercado", antelacion:"Antelación", ritmo_ocupacion:"Ritmo de ocupación propio",
-  hueco:"Hueco entre reservas", ajuste_manual:"Ajuste manual", freno_mercado:"Freno de descuentos (ya bajo el mercado)"};
+  hueco:"Hueco entre reservas", ajuste_manual:"Ajuste manual", freno_mercado:"Freno de descuentos (ya bajo el mercado)", estancia_corta:"Recargo por estancia corta (limpieza)"};
 const $ = (s, r=document) => r.querySelector(s);
 const h = (s) => { const t = document.createElement("template"); t.innerHTML = s.trim(); return t.content; };
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -116,6 +129,7 @@ const fechaLarga = (iso) => new Date(iso + "T12:00").toLocaleDateString("es-ES",
 function avisar(t, ms=3200){ const a=$("#aviso-flotante"); a.textContent=t; a.style.display="block"; clearTimeout(avisar.t); avisar.t=setTimeout(()=>a.style.display="none", ms); }
 async function api(ruta, cuerpo){
   const r = await fetch(ruta, cuerpo === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json","X-Panel":"1"}, body:JSON.stringify(cuerpo)});
+  if(r.status === 401){ location.href = "/entrar"; throw new Error("sesión caducada"); }
   const j = await r.json();
   if(!r.ok) throw new Error(j.error || r.statusText);
   return j;
@@ -125,7 +139,8 @@ function poner(o, ruta, v){ const p = ruta.split("."); const u = p.pop(); p.redu
 
 async function cargar(){
   const d = await api("/api/datos");
-  E.cfg = d.config; E.res = d.ultimo; E.cred = d.credenciales;
+  E.cfg = d.config; E.res = d.ultimo; E.cred = d.credenciales; E.remoto = d.remoto;
+  if(d.remoto && !$("#b-salir")){ const a = document.createElement("a"); a.id = "b-salir"; a.href = "/salir"; a.textContent = "Salir"; a.className = "pastilla"; a.style.textDecoration = "none"; $("header").append(a); }
   if(!E.res) await simular();
   pintar();
   if(d.rastreo.activo) seguirRastreo();
@@ -205,7 +220,7 @@ function vistaApartamento(c, k){
   cal.innerHTML = `<h2>Calendario <small>precio nuevo y estancia mínima · verde sube, rojo baja, gris reservado</small></h2><div class="calendario">${calendario(r)}</div>`;
   const det = document.createElement("div"); det.className = "tarjeta detalle"; det.id = "detalle";
   dos.append(cal, det); c.append(dos);
-  cal.querySelectorAll(".dia[data-f]").forEach(el => el.onclick = () => { E.sel = el.dataset.f; cal.querySelectorAll(".sel").forEach(x => x.classList.remove("sel")); el.classList.add("sel"); detalle(r); });
+  cal.querySelectorAll(".dia[data-f]").forEach(el => el.onclick = () => { E.sel = el.dataset.f; E.abierta = true; cal.querySelectorAll(".sel").forEach(x => x.classList.remove("sel")); el.classList.add("sel"); detalle(r); });
   if(!E.sel){ const p = r.dias.find(x => x.libre); E.sel = p ? p.fecha : r.dias[0].fecha; }
   const s = cal.querySelector(`.dia[data-f="${E.sel}"]`); if(s) s.classList.add("sel");
   detalle(r);
@@ -259,7 +274,9 @@ function detalle(r){
     ${d.notas.length ? `<p class="nota">${d.notas.map(esc).join(" · ")}</p>` : ""}
     ${m ? `<p class="nota">Mercado esa noche (precio en Airbnb): P25 ${eur(m.p25)} · mediana ${eur(m.mediana)} · P75 ${eur(m.p75)} · ocupación estimada ${pct(m.ocupacion)}.<br>Nuestro precio en Airbnb sería ${eur(d.precio * r.indicadores.recargo_airbnb)}.</p>` : ""}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-      <button id="fijar">Fijar precio…</button><button id="notocar">No tocar esta fecha</button></div>`;
+      <button id="fijar">Fijar precio…</button><button id="notocar">No tocar esta fecha</button><button id="cerrar-det" class="solo-movil">Cerrar</button></div>`;
+  el.classList.toggle("abierta", !!E.abierta);
+  $("#cerrar-det").onclick = () => { E.abierta = false; el.classList.remove("abierta"); };
   $("#fijar").onclick = () => { const v = prompt(`Precio fijo para el ${d.fecha} (€):`, d.precio); if(v && !isNaN(parseFloat(v))) nuevoAjuste({desde:d.fecha, hasta:d.fecha, tipo:"precio_fijo", valor:parseFloat(v.replace(",", ".")), apartamentos:[r.apartamento.id], nota:"Fijado desde el calendario"}); };
   $("#notocar").onclick = () => nuevoAjuste({desde:d.fecha, hasta:d.fecha, tipo:"no_tocar", valor:0, apartamentos:[r.apartamento.id], nota:"No tocar"});
 }
@@ -333,13 +350,21 @@ function vistaReglas(c){
   c.append(h(`<div class="tarjeta"><h2>Huecos entre reservas y estancia mínima</h2>
     <p class="ayuda">Un hueco más corto que la estancia mínima no se puede vender: la herramienta baja la estancia mínima de esas noches a la medida del hueco y aplica el ajuste de la primera regla que encaje.</p>
     <div class="rejilla campos">${marca("Tratar los huecos", R + "huecos.activa")}${marca("Ajustar la estancia mínima al hueco", R + "huecos.ajustar_estancia_minima")}
-      ${campo("Última hora: a menos de (días)", R + "estancia_minima.ultima_hora_dias", 'min="0" step="1"')}
-      ${campo("…estancia mínima de (noches)", R + "estancia_minima.ultima_hora_noches", 'min="0" step="1"')}
       ${campo("Fechas lejanas: desde (días)", R + "estancia_minima.lejana_desde_dias", 'min="0" step="1"')}
       ${campo("…estancia mínima de (noches)", R + "estancia_minima.lejana_noches", 'min="0" step="1"')}</div>
     <table style="margin-top:12px"><thead><tr><th>Hueco de hasta (noches)</th><th>Con antelación de al menos (días)</th><th>Ajuste (%)</th><th></th></tr></thead><tbody>
     ${hu.map((_, i) => `<tr><td><input type="number" step="1" min="1" data-ruta="${R}huecos.reglas.${i}.noches_max"></td><td><input type="number" step="1" min="0" data-ruta="${R}huecos.reglas.${i}.antelacion_min"></td><td><input type="number" step="any" data-ruta="${R}huecos.reglas.${i}.ajuste_pct"></td><td><button class="x" data-quitar="huecos.reglas" data-i="${i}">quitar</button></td></tr>`).join("")}
     </tbody></table><button style="margin-top:8px" data-anadir="hueco">Añadir regla</button></div>`));
+
+  const rl = E.cfg.reglas.estancias_cortas.relajacion;
+  c.append(h(`<div class="tarjeta"><h2>Limpieza y estancias cortas</h2>
+    <p class="ayuda">Cada reserva supone una limpieza. La herramienta no deja que ninguna reserva, por corta que sea, deje menos que la limpieza más el beneficio mínimo. La estancia mínima habitual se mantiene, pero las noches libres que no son hueco se abren a estancias más cortas cuando se acerca la fecha, con un recargo que reparte la limpieza entre menos noches.</p>
+    <div class="rejilla campos">${marca("Activo", R + "estancias_cortas.activa")}
+      ${campo("Coste de cada limpieza (€)", R + "estancias_cortas.coste_limpieza", 'min="0"')}
+      ${campo("Beneficio mínimo por reserva (€)", R + "estancias_cortas.beneficio_minimo_reserva", 'min="0"')}</div>
+    <table style="margin-top:12px"><thead><tr><th>A menos de (días)</th><th>Se admiten (noches)</th><th>Solo si va retrasado de reservas</th><th></th></tr></thead><tbody>
+    ${rl.map((_, i) => `<tr><td><input type="number" step="1" min="0" data-ruta="${R}estancias_cortas.relajacion.${i}.antelacion_max"></td><td><input type="number" step="1" min="1" data-ruta="${R}estancias_cortas.relajacion.${i}.noches"></td><td><input type="checkbox" data-ruta="${R}estancias_cortas.relajacion.${i}.solo_si_retraso"></td><td><button class="x" data-quitar="estancias_cortas.relajacion" data-i="${i}">quitar</button></td></tr>`).join("")}
+    </tbody></table><button style="margin-top:8px" data-anadir="relajacion">Añadir regla</button></div>`));
 
   const ev = E.cfg.reglas.eventos;
   const auto = (E.res && E.res.eventos_verificados) || [];
@@ -368,6 +393,7 @@ function vistaReglas(c){
   c.querySelectorAll("[data-anadir]").forEach(b => b.onclick = () => {
     const t = b.dataset.anadir;
     if(t === "hueco") E.cfg.reglas.huecos.reglas.push({noches_max:2, antelacion_min:0, ajuste_pct:0});
+    if(t === "relajacion") E.cfg.reglas.estancias_cortas.relajacion.push({antelacion_max:14, noches:3, solo_si_retraso:true});
     if(t === "evento") E.cfg.reglas.eventos.push({nombre:"Nuevo evento", desde:hoy, hasta:hoy, ajuste_pct:10});
     if(t === "ajuste") E.cfg.reglas.ajustes_manuales.push({desde:hoy, hasta:hoy, tipo:"porcentaje", valor:0, apartamentos:null, nota:""});
     cambio(); pintar(true);

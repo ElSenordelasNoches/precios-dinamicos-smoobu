@@ -91,6 +91,32 @@ class Motor(unittest.TestCase):
         self.assertGreater(dia(ocupado, f)["precio"], dia(libre, f)["precio"])
 
 
+class EstanciasCortas(unittest.TestCase):
+    def test_ninguna_reserva_deja_menos_que_limpieza_mas_beneficio(self):
+        c = cfg_prueba(estancias_cortas={"coste_limpieza": 30, "beneficio_minimo_reserva": 25})
+        a = HOY + dt.timedelta(days=3)
+        cal = calendario([(HOY, a), (a + dt.timedelta(days=1), a + dt.timedelta(days=6))], precio=45)
+        r = motor.calcular(c, c["apartamentos"][0], cal, None, HOY)
+        x = dia(r, a)  # hueco de una sola noche
+        self.assertEqual(x["minimo"], 1)
+        self.assertGreaterEqual(x["precio"] * x["minimo"], 55)
+        for y in r["dias"]:
+            self.assertGreaterEqual(y["precio"] * y["minimo"], 55)
+
+    def test_se_abre_a_estancias_cortas_al_acercarse_la_fecha(self):
+        c = cfg_prueba(estancias_cortas={"relajacion": [
+            {"antelacion_max": 6, "noches": 2, "solo_si_retraso": False},
+            {"antelacion_max": 21, "noches": 3, "solo_si_retraso": True}]},
+            limites={"cambio_maximo_pct": 0})
+        r = motor.calcular(c, c["apartamentos"][0], calendario(), None, HOY)
+        cerca, medio, lejos = (dia(r, HOY + dt.timedelta(days=n)) for n in (4, 15, 60))
+        self.assertEqual(cerca["minimo"], 2)
+        self.assertEqual(medio["minimo"], 3)      # calendario vacío: va retrasado
+        self.assertEqual(lejos["minimo"], 4)
+        self.assertGreater(cerca["factores"]["estancia_corta"], medio["factores"]["estancia_corta"])
+        self.assertNotIn("estancia_corta", lejos["factores"])
+
+
 class Auxiliares(unittest.TestCase):
     def test_pascua(self):
         self.assertEqual(festivos.pascua(2026), dt.date(2026, 4, 5))

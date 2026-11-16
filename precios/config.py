@@ -76,9 +76,21 @@ POR_DEFECTO = {
                 {"noches_max": 3, "antelacion_min": 0, "ajuste_pct": -5},
             ],
         },
-        "estancia_minima": {"ultima_hora_dias": 5, "ultima_hora_noches": 2,
+        "estancia_minima": {"ultima_hora_dias": 0, "ultima_hora_noches": 0,
                             "lejana_desde_dias": 0, "lejana_noches": 0,
                             "temporadas": []},
+        # Estancias más cortas que la mínima habitual y coste de cada limpieza.
+        "estancias_cortas": {
+            "activa": True,
+            "coste_limpieza": 30,
+            # Lo que debe dejar cada reserva, como poco, después de pagar la limpieza.
+            "beneficio_minimo_reserva": 15,
+            # Noches libres que no son hueco: a menos de X días se admiten N noches.
+            "relajacion": [
+                {"antelacion_max": 6, "noches": 2, "solo_si_retraso": False},
+                {"antelacion_max": 21, "noches": 3, "solo_si_retraso": True},
+            ],
+        },
         "limites": {
             # Más allá de X días no se baja de base+pct (protege fechas lejanas).
             "minimo_lejano": {"desde_dias": 30, "pct_sobre_base": -8},

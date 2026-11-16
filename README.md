@@ -34,7 +34,9 @@ precio = base × estacionalidad × día de la semana × eventos
 | **Antelación** | Descuento gradual de última hora para lo que sigue libre y prima para las fechas lejanas. |
 | **Ritmo propio** | Compara lo ya reservado alrededor de cada fecha con lo que debería haber a esa antelación para acabar en la ocupación objetivo (la curva se aprende del historial propio de reservas). |
 | **Huecos** | Los huecos entre reservas más cortos que la estancia mínima se abren bajando la estancia mínima a su medida, con el recargo o descuento que se configure. |
-| **Estancia mínima dinámica** | Por defecto, por temporada, más corta a última hora, más larga en fechas lejanas o en eventos. |
+| **Estancia mínima dinámica** | Se mantiene la mínima habitual, pero las noches libres que no son hueco se abren a estancias más cortas al acercarse la fecha (siempre, o solo si se va retrasado de reservas), con un recargo que reparte la limpieza entre menos noches. |
+| **Limpieza y beneficio por reserva** | Usted indica lo que cuesta cada limpieza y el beneficio mínimo que debe dejar una reserva: ninguna noche se vende por debajo de (limpieza + beneficio) / estancia mínima. |
+| **Freno de descuentos** | Si el precio ya está por debajo del cuartil barato de la competencia, no se descuenta por demanda floja ni por retraso de reservas. |
 | **Ajustes manuales** | Precio fijo, porcentaje o «no tocar» por rango de fechas. Además, si usted cambia un precio a mano en Smoobu, la herramienta lo detecta y lo respeta. |
 
 Tres estrategias (prudente, equilibrada, ambiciosa) escalan la fuerza de los
@@ -93,6 +95,35 @@ python -m precios panel
 - Tras enviar, relee Smoobu y verifica que lo guardado coincide.
 - `config.json`, `secretos.json` y `datos/` están fuera del control de versiones.
 - El panel solo escucha en la propia máquina.
+
+## Verlo desde el móvil
+
+El panel solo escucha en la propia máquina. Para abrirlo desde fuera se publica
+con un túnel de Cloudflare en un dominio propio, protegido con contraseña:
+
+1. `python -m precios clave-panel --host precios.midominio.com` genera la
+   contraseña (queda en `datos/clave_panel.txt`; apúntela y borre el archivo).
+   Con `--pedir` la escribe usted.
+2. Cree el túnel y su registro DNS con `cloudflared` y deje su configuración en
+   `datos/tunel.yml`:
+
+```
+tunnel: <id del túnel>
+credentials-file: <ruta al .json de credenciales>
+ingress:
+  - hostname: precios.midominio.com
+    service: http://127.0.0.1:8777
+  - service: http_status:404
+```
+
+3. `python servicio.py` arranca el panel y el túnel, y relanza el túnel si se
+   cae. En Windows, «Instalar arranque automatico.cmd» lo deja arrancando con
+   la sesión.
+
+Desde fuera solo se atiende ese dominio, hay que iniciar sesión, los intentos
+fallidos se limitan y las órdenes que cambian algo exigen una cabecera que
+ninguna otra web puede enviar en nombre del usuario. El equipo tiene que estar
+encendido.
 
 ## Ejecución periódica
 
