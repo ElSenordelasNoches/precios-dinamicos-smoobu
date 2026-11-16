@@ -220,6 +220,10 @@ def resumen(salida: dict) -> str:
             L.append(f"   Mercado ({m['anuncios']} comparables, oferta {m['oferta']}): precio por noche en Airbnb "
                      f"P25 {n[25]:.0f} · mediana {n[50]:.0f} · P75 {n[75]:.0f} €  → nuestro precio en Airbnb con la base: "
                      f"{b['valor'] * k['recargo_airbnb']:.0f} €")
+        pr = r.get("airbnb_propio")
+        if pr:
+            L.append(f"   Nuestro anuncio en Airbnb: visto a {pr['precio']:.0f} €/noche en {pr['ventanas']} ventanas "
+                     f"(solo el {pr['mas_baratos_pct']} % de los comparables es más barato); última fecha en la que aparece: {pr['visible_hasta']}")
         bk = m.get("booking") or {}
         if bk.get("ventanas"):
             occ = [v["ocupacion"] for v in bk["ventanas"][:8]]

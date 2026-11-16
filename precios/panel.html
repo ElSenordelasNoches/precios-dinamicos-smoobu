@@ -199,7 +199,7 @@ function vistaApartamento(c, k){
     ${kp("Ocupación próximos 30 días", pct(I["30"].ocupacion), `Mercado ${pct(I["30"].ocupacion_mercado)} · a 90 días ${pct(I["90"].ocupacion)} (mercado ${pct(I["90"].ocupacion_mercado)})`)}
     ${kp("Ocupación últimos 90 días", pct(I.ocupacion_pasada_90), `Último año ${pct(I.ocupacion_pasada_365)}`)}
     ${kp("Precio medio noches libres (90 d)", `${eur(I["90"].precio_medio_actual)} → ${eur(I["90"].precio_medio_nuevo)}`, `${I.noches_que_cambian} noches cambian: ${I.suben} suben, ${I.bajan} bajan`)}
-    ${kp("Mercado · mediana por noche", m.disponible ? eur(m.nivel[50]) : "—", m.disponible ? `En Airbnb, ${m.anuncios} comparables. Nuestro precio allí: ${eur(b.valor * rec)}` : "Sin rastreo todavía")}
+    ${kp("Mercado · mediana por noche", m.disponible ? eur(m.nivel[50]) : "—", m.disponible ? `En Airbnb, ${m.anuncios} comparables. ` + (r.airbnb_propio ? `Nuestro anuncio se ve a ${eur(r.airbnb_propio.precio)}: solo el ${r.airbnb_propio.mas_baratos_pct} % es más barato. Aparece hasta el ${r.airbnb_propio.visible_hasta.split("-").reverse().join("/")}.` : `Nuestro precio allí: ${eur(b.valor * rec)}`) : "Sin rastreo todavía")}
   </div>`));
   c.append(h(`<div class="tarjeta"><h2>Precio base <small>${esc(b.motivo)}</small></h2>
     <div class="rejilla campos">

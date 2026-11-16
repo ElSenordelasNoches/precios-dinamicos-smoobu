@@ -401,7 +401,20 @@ def calcular(cfg: dict, apto: dict, cal: Calendario, modelo, hoy: dt.date,
         })
         d += UN_DIA
 
+    # Nuestro anuncio tal como se ve en Airbnb: precio y posición frente a los comparables.
+    propio = None
+    if hay_mercado and apto.get("airbnb_id"):
+        vistos = modelo.precio_propio(apto["airbnb_id"])
+        habituales = sorted(modelo.segmento(dorm)["habitual"].values())
+        if vistos and habituales:
+            orden = sorted(vistos.values())
+            mediano = orden[len(orden) // 2]
+            propio = {"precio": mediano, "ventanas": len(vistos),
+                      "mas_baratos_pct": round(100 * sum(1 for h in habituales if h < mediano) / len(habituales)),
+                      "visible_hasta": str(max(vistos))[:10]}
+
     return {
+        "airbnb_propio": propio,
         "apartamento": {k: apto.get(k) for k in ("id", "nombre", "dormitorios", "precio_base",
                                                  "precio_minimo", "precio_maximo", "estancia_minima")},
         "base": base_info, "dias": dias, "mercado": resumen,

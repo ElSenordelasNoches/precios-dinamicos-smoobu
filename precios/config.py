@@ -32,7 +32,7 @@ POR_DEFECTO = {
         "caja": {"sw_lat": 28.482, "sw_lng": -13.885, "ne_lat": 28.520, "ne_lng": -13.840},
         "adultos": 2,
         "noches_consulta": 4,
-        "paginas_max": 5,
+        "paginas_max": 6,
         "pausa_segundos": [1.5, 3.5],
         # Antigüedad máxima (días) del último rastreo para darlo por bueno.
         "dias_validez": 6,
