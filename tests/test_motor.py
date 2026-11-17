@@ -146,6 +146,18 @@ class MinimosEstanciaCorta(unittest.TestCase):
         self.assertGreater(precios[1], precios[0])
         self.assertGreater(precios[2], precios[1])
 
+    def test_minimo_de_una_noche_en_cualquier_caso(self):
+        # Ni la última hora ni el cambio máximo por ejecución lo perforan.
+        c = self._cfg()
+        c["reglas"]["limites"]["cambio_maximo_pct"] = 10
+        for antelacion in (0, 1, 2):
+            f, cal = self._hueco(1, antelacion)
+            for d in cal.dias.values():
+                d["precio"] = 50
+            x = dia(motor.calcular(c, c["apartamentos"][0], cal, None, HOY), f)
+            self.assertEqual(x["minimo"], 1)
+            self.assertGreaterEqual(x["precio"], 85)
+
     def test_no_afecta_a_las_noches_de_estancia_normal(self):
         c = self._cfg()
         r = motor.calcular(c, c["apartamentos"][0], calendario(), None, HOY)
