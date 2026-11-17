@@ -36,6 +36,7 @@ precio = base × estacionalidad × día de la semana × eventos
 | **Huecos** | Los huecos entre reservas más cortos que la estancia mínima se abren bajando la estancia mínima a su medida, con el recargo o descuento que se configure. |
 | **Estancia mínima dinámica** | Se mantiene la mínima habitual, pero las noches libres que no son hueco se abren a estancias más cortas al acercarse la fecha (siempre, o solo si se va retrasado de reservas), con un recargo que reparte la limpieza entre menos noches. |
 | **Limpieza y beneficio por reserva** | Usted indica lo que cuesta cada limpieza y el beneficio mínimo que debe dejar una reserva: ninguna noche se vende por debajo de (limpieza + beneficio) / estancia mínima. |
+| **Mínimo neto en estancias cortas** | Por apartamento, lo mínimo que debe quedar por noche cuando una noche se vende para 1, 2 o 3 noches. Es el mínimo de las fechas inmediatas: con más antelación, más demanda o en evento sube en la misma proporción. |
 | **Freno de descuentos** | Si el precio ya está por debajo del cuartil barato de la competencia, no se descuenta por demanda floja ni por retraso de reservas. |
 | **Ajustes manuales** | Precio fijo, porcentaje o «no tocar» por rango de fechas. Además, si usted cambia un precio a mano en Smoobu, la herramienta lo detecta y lo respeta. |
 

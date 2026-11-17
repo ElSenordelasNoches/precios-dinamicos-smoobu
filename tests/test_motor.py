@@ -117,6 +117,43 @@ class EstanciasCortas(unittest.TestCase):
         self.assertNotIn("estancia_corta", lejos["factores"])
 
 
+class MinimosEstanciaCorta(unittest.TestCase):
+    def _cfg(self):
+        c = cfg_prueba()
+        c["apartamentos"][0]["minimos_estancia_corta"] = {"1": 85, "2": 75, "3": 70}
+        c["apartamentos"][0]["precio_maximo"] = 200
+        return c
+
+    def _hueco(self, noches, antelacion):
+        a = HOY + dt.timedelta(days=antelacion)
+        return a, calendario([(a - dt.timedelta(days=5), a), (a + dt.timedelta(days=noches), a + dt.timedelta(days=noches + 5))])
+
+    def test_minimo_segun_las_noches_del_hueco(self):
+        c = self._cfg()
+        for noches, minimo in ((1, 85), (2, 75), (3, 70)):
+            f, cal = self._hueco(noches, 3)
+            x = dia(motor.calcular(c, c["apartamentos"][0], cal, None, HOY), f)
+            self.assertEqual(x["minimo"], noches)
+            self.assertGreaterEqual(x["precio"], minimo)
+
+    def test_mas_lejos_mas_caro(self):
+        c = self._cfg()
+        precios = []
+        for antelacion in (3, 12, 45):
+            f, cal = self._hueco(1, antelacion)
+            precios.append(dia(motor.calcular(c, c["apartamentos"][0], cal, None, HOY), f)["precio"])
+        self.assertGreaterEqual(precios[0], 85)
+        self.assertGreater(precios[1], precios[0])
+        self.assertGreater(precios[2], precios[1])
+
+    def test_no_afecta_a_las_noches_de_estancia_normal(self):
+        c = self._cfg()
+        r = motor.calcular(c, c["apartamentos"][0], calendario(), None, HOY)
+        x = dia(r, HOY + dt.timedelta(days=60))
+        self.assertEqual(x["minimo"], 4)
+        self.assertNotIn("minimo_estancia_corta", x["factores"])
+
+
 class Auxiliares(unittest.TestCase):
     def test_pascua(self):
         self.assertEqual(festivos.pascua(2026), dt.date(2026, 4, 5))

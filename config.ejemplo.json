@@ -29,7 +29,12 @@
       "precio_minimo": 45,
       "precio_maximo": 120,
       "estancia_minima": 3,
-      "airbnb_id": null
+      "airbnb_id": null,
+      "minimos_estancia_corta": {
+        "1": 80,
+        "2": 70,
+        "3": 65
+      }
     }
   ],
   "reglas": {

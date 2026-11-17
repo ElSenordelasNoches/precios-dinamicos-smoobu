@@ -118,7 +118,7 @@ const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov"
 const DIAS = [["lun","L"],["mar","M"],["mie","X"],["jue","J"],["vie","V"],["sab","S"],["dom","D"]];
 const NOMBRES = {estacionalidad:"Estacionalidad", dia_semana:"Día de la semana", eventos:"Eventos y festivos",
   demanda_mercado:"Demanda del mercado", antelacion:"Antelación", ritmo_ocupacion:"Ritmo de ocupación propio",
-  hueco:"Hueco entre reservas", ajuste_manual:"Ajuste manual", freno_mercado:"Freno de descuentos (ya bajo el mercado)", estancia_corta:"Recargo por estancia corta (limpieza)"};
+  hueco:"Hueco entre reservas", ajuste_manual:"Ajuste manual", freno_mercado:"Freno de descuentos (ya bajo el mercado)", estancia_corta:"Recargo por estancia corta (limpieza)", minimo_estancia_corta:"Mínimo neto para estancia corta"};
 const $ = (s, r=document) => r.querySelector(s);
 const h = (s) => { const t = document.createElement("template"); t.innerHTML = s.trim(); return t.content; };
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -209,6 +209,12 @@ function vistaApartamento(c, k){
       ${campo("Estancia mínima (noches)", `apartamentos.${k}.estancia_minima`, 'min="1" step="1"')}
       ${campo("Dormitorios (para comparar)", `apartamentos.${k}.dormitorios`, 'min="0" step="1"')}
       <label>N.º del anuncio en Airbnb<input type="text" data-ruta="apartamentos.${k}.airbnb_id" data-nulo="1" placeholder="opcional"></label>
+    </div>
+    <h2 style="margin-top:16px">Mínimo neto por noche en estancias cortas <small>lo que debe quedarles limpio de comisión; con más antelación o más demanda sube</small></h2>
+    <div class="rejilla campos">
+      ${campo("Si se vende 1 noche (€)", `apartamentos.${k}.minimos_estancia_corta.1`, 'min="0" data-nulo="1"')}
+      ${campo("Si se venden 2 noches (€)", `apartamentos.${k}.minimos_estancia_corta.2`, 'min="0" data-nulo="1"')}
+      ${campo("Si se venden 3 noches (€)", `apartamentos.${k}.minimos_estancia_corta.3`, 'min="0" data-nulo="1"')}
     </div>
     <p class="nota" style="margin:10px 0 0">Los precios son los de Smoobu (precio base de la cuenta). Smoobu les añade después el recargo de cada portal (${Object.entries(E.cfg.reglas.canales).map(([n,v])=>`${n} +${v} %`).join(", ")}).${b.mercado_equivalente ? ` La mediana del mercado equivale a un precio base de ${eur(b.mercado_equivalente)}.` : ""}</p></div>`));
   const t = document.createElement("div"); t.className = "tarjeta";

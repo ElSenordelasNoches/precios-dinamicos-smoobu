@@ -177,6 +177,7 @@ def calcular(cfg: dict, apto: dict, cal: Calendario, modelo, hoy: dt.date,
     ec = reglas.get("estancias_cortas") or {}
     limpieza = float(ec.get("coste_limpieza", 0))
     beneficio_min = float(ec.get("beneficio_minimo_reserva", 0))
+    minimos_cortos = {str(k): v for k, v in (apto.get("minimos_estancia_corta") or {}).items()}
     objetivo = rit["objetivo_ocupacion_pct"] / 100
     media = max(1, int(rit["ventana_dias"]) // 2)
     recargo = 1 + reglas["canales"].get("airbnb", 0) / 100
@@ -343,6 +344,23 @@ def calcular(cfg: dict, apto: dict, cal: Calendario, modelo, hoy: dt.date,
                 bruto = objetivo_freno
                 notas.append("Ya está por debajo del mercado: no se descuenta más")
 
+        # Mínimo neto por noche cuando la noche se vende para estancias cortas
+        # (1, 2 o 3 noches). Es el mínimo de las fechas inmediatas: con más
+        # antelación, más demanda o en evento sube en la misma proporción que
+        # esos factores, de modo que una noche suelta lejana sale más cara.
+        suelo_corta = 0.0
+        if fijo is None and minimos_cortos.get(str(minimo)):
+            suelo_corta = float(minimos_cortos[str(minimo)])
+            escalado = suelo_corta
+            for k in ("hueco", "eventos", "demanda_mercado"):
+                if f.get(k, 0) > 0:
+                    escalado *= 1 + f[k] / 100
+            if bruto < escalado - 0.01:
+                f["minimo_estancia_corta"] = (escalado / bruto - 1) * 100
+                bruto = escalado
+                notas.append("Mínimo neto de %.0f € por noche para %d noche%s"
+                             % (suelo_corta, minimo, "" if minimo == 1 else "s"))
+
         # 11. Límites
         suelo, techo = pmin, pmax
         ml = lim.get("minimo_lejano") or {}
@@ -354,7 +372,8 @@ def calcular(cfg: dict, apto: dict, cal: Calendario, modelo, hoy: dt.date,
                 techo = float(t.get("maximo", techo))
         # Ninguna reserva puede dejar menos que la limpieza más el beneficio mínimo.
         suelo_reserva = (limpieza + beneficio_min) / minimo if ec.get("activa") else 0.0
-        por_limpieza = suelo_reserva > suelo
+        por_limpieza = suelo_reserva > max(suelo, suelo_corta)
+        suelo_reserva = max(suelo_reserva, suelo_corta)
         suelo = min(max(suelo, suelo_reserva), techo)
         precio = _acotar(bruto, suelo, techo)
         if precio != bruto:
@@ -416,7 +435,8 @@ def calcular(cfg: dict, apto: dict, cal: Calendario, modelo, hoy: dt.date,
     return {
         "airbnb_propio": propio,
         "apartamento": {k: apto.get(k) for k in ("id", "nombre", "dormitorios", "precio_base",
-                                                 "precio_minimo", "precio_maximo", "estancia_minima")},
+                                                 "precio_minimo", "precio_maximo", "estancia_minima",
+                                                 "minimos_estancia_corta")},
         "base": base_info, "dias": dias, "mercado": resumen,
         "curva_antelacion": origen_curva,
         "indicadores": indicadores(dias, cal, hoy, reglas, base),
